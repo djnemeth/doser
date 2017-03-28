@@ -3,7 +3,9 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include <QLayout>
 #include <QPushButton>
+#include <QString>
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
@@ -17,26 +19,13 @@ DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 			"left: 1ex;"
 		"}");
 
-	QVector<QLabel*> labels =
-	{
-		new QLabel("Original image"),
-		new QLabel("Result of deep\nsegmentation"),
-		new QLabel("Result of quick\nsegmentation")
-	};
-
-	for (QLabel* label : labels)
-	{
-		label->setAlignment(Qt::AlignCenter);
-		label->setFrameStyle(QFrame::Panel);
-		label->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
-	}
+	QVector<QGroupBox*> groups = createGuiGroups();
 
 	mainLayout = new QGridLayout;
-	mainLayout->addWidget(createSettingsGui(), 0, 0);
-	mainLayout->addWidget(labels[0], 0, 1);
-	mainLayout->addWidget(labels[1], 0, 2);
-	mainLayout->addWidget(labels[2], 0, 3);
-
+	mainLayout->addWidget(groups[0], 0, 0);
+	mainLayout->addWidget(groups[1], 0, 1);
+	mainLayout->addWidget(groups[2], 0, 2);
+	mainLayout->addWidget(groups[3], 0, 3);
 	mainLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
 	mainLayout->addWidget(new QPushButton("Open"), 1, 1);
 	mainLayout->addWidget(new QPushButton("Save"), 1, 2);
@@ -51,16 +40,17 @@ void DoserWidget::modeChanged()
 	SegmentationMode mode = static_cast<SegmentationMode>(
 		modeComboBox->currentData().toInt());
 
-	bool isQuickVisible = mode == QUICK || mode == BOTH;
-	bool isDeepVisible = mode == DEEP || mode == BOTH;
+	bool isQuickVisible = mode == QUICK_MODE || mode == BOTH_MODE;
+	bool isDeepVisible = mode == DEEP_MODE || mode == BOTH_MODE;
 
-	displayGridColumn(QUICK_COLUMN_INDEX, isQuickVisible);
-	displayGridColumn(DEEP_COLUMN_INDEX, isDeepVisible);
+	displayGridColumn(QUICK_GROUP_COLUMN_INDEX, isQuickVisible);
+	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
 }
 
 void DoserWidget::displayGridColumn(int column, bool isVisible)
 {
-	for (int i = 0; i < mainLayout->rowCount(); ++i) {
+	for (int i = 0; i < mainLayout->rowCount(); ++i)
+	{
 		mainLayout->itemAtPosition(i, column)->widget()->setVisible(isVisible);
 	}
 }
@@ -68,9 +58,9 @@ void DoserWidget::displayGridColumn(int column, bool isVisible)
 QGroupBox* DoserWidget::createSettingsGui()
 {
 	modeComboBox = new QComboBox;
-	modeComboBox->addItem("quick", QUICK);
-	modeComboBox->addItem("deep", DEEP);
-	modeComboBox->addItem("deep & quick", BOTH);
+	modeComboBox->addItem("quick", QUICK_MODE);
+	modeComboBox->addItem("deep", DEEP_MODE);
+	modeComboBox->addItem("deep & quick", BOTH_MODE);
 	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(modeChanged()));
 
 	QGridLayout* settingsLayout = new QGridLayout;
@@ -82,4 +72,35 @@ QGroupBox* DoserWidget::createSettingsGui()
 	settingsGroup->setLayout(settingsLayout);
 
 	return settingsGroup;
+}
+
+QVector<QGroupBox*> DoserWidget::createGuiGroups()
+{
+	QVector<QGroupBox*> groups;
+	groups.push_back(createSettingsGui());
+
+	QVector<ImageLabelType> labelTypes = { SOURCE_LABEL, DEEP_LABEL, QUICK_LABEL };
+	QVector<QString> groupTitles = { "Original image", "Deep segments", "Quick segments" };
+	QVector<QString> labelTexts =
+	{
+		"Original image\nnot yet selected.",
+		"Deep segments\nnot yet computed.",
+		"Quick segments\nnot yet computed."
+	};
+
+	for (int i = 0; i < labelTypes.size(); ++i)
+	{
+		QLabel* label = new QLabel(labelTexts[i]);
+		label->setAlignment(Qt::AlignCenter);
+		imageLabels.insert(labelTypes[i], label);
+
+		QVBoxLayout* layout = new QVBoxLayout;
+		layout->addWidget(label);
+
+		QGroupBox* group = new QGroupBox(groupTitles[i]);
+		group->setLayout(layout);
+		groups.push_back(group);
+	}
+
+	return groups;
 }
