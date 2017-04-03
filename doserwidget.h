@@ -8,6 +8,7 @@
 #include <QMap>
 #include <QVector>
 #include <QWidget>
+
 #include "dosermodel.h"
 
 enum SegmentationMode
@@ -34,6 +35,8 @@ signals:
 
 private slots:
 	void changeGuiMode();
+	void imageChanged(const QImage& image);
+	void openImage();
 
 private:
 	QGroupBox* createSettingsGui();
@@ -44,8 +47,6 @@ private:
 	QGridLayout* mainLayout;
 	QComboBox* modeComboBox;
 	QMap<ImageLabelType, QLabel*> imageLabels;
-	QLabel* deepImageLabel;
-	QLabel* quickImageLabel;
 };
 
 #endif // DOSERWIDGET_H

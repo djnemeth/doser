@@ -1,5 +1,6 @@
 #include "doserwidget.h"
 #include <QComboBox>
+#include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
@@ -9,6 +10,9 @@
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
+	connect(&model, SIGNAL(imageChanged(const QImage&)),
+			this, SLOT(imageChanged(const QImage&)));
+
 	QVector<QGroupBox*> groups = createGuiGroups();
 
 	mainLayout = new QGridLayout;
@@ -18,7 +22,11 @@ DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 	mainLayout->addWidget(groups[3], 0, 3);
 
 	mainLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
-	mainLayout->addWidget(new QPushButton("Open"), 1, 1);
+
+	QPushButton* openButton = new QPushButton("Open");
+	connect(openButton, SIGNAL(clicked(bool)), this, SLOT(openImage()));
+	mainLayout->addWidget(openButton, 1, 1);
+
 	mainLayout->addWidget(new QPushButton("Save"), 1, 2);
 	mainLayout->addWidget(new QPushButton("Save"), 1, 3);
 
@@ -36,6 +44,22 @@ void DoserWidget::changeGuiMode()
 
 	displayGridColumn(QUICK_GROUP_COLUMN_INDEX, isQuickVisible);
 	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
+}
+
+void DoserWidget::imageChanged(const QImage& image)
+{
+	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(image));
+	imageLabels[SOURCE_LABEL]->setScaledContents(true);
+}
+
+void DoserWidget::openImage()
+{
+	QString imagePath = QFileDialog::getOpenFileName(this,
+		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
+	if (!imagePath.isEmpty() && !imagePath.isNull())
+	{
+		model.openImage(imagePath);
+	}
 }
 
 void DoserWidget::displayGridColumn(int column, bool isVisible)
