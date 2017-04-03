@@ -8,6 +8,7 @@
 #include <QMap>
 #include <QVector>
 #include <QWidget>
+#include "dosermodel.h"
 
 enum SegmentationMode
 {
@@ -32,13 +33,14 @@ public:
 signals:
 
 private slots:
-	void modeChanged();
+	void changeGuiMode();
 
 private:
 	QGroupBox* createSettingsGui();
 	QVector<QGroupBox*> createGuiGroups();
 	void displayGridColumn(int column, bool isVisible);
 
+	DoserModel model;
 	QGridLayout* mainLayout;
 	QComboBox* modeComboBox;
 	QMap<ImageLabelType, QLabel*> imageLabels;

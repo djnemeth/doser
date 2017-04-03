@@ -9,16 +9,6 @@
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
-	setStyleSheet("QGroupBox {"
-			"border: 1px solid gray;"
-			"border-radius: 3px;"
-			"margin-top: 1ex;"
-		"}"
-		"QGroupBox::title {"
-			"subcontrol-origin: margin;"
-			"left: 1ex;"
-		"}");
-
 	QVector<QGroupBox*> groups = createGuiGroups();
 
 	mainLayout = new QGridLayout;
@@ -26,16 +16,17 @@ DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 	mainLayout->addWidget(groups[1], 0, 1);
 	mainLayout->addWidget(groups[2], 0, 2);
 	mainLayout->addWidget(groups[3], 0, 3);
+
 	mainLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
 	mainLayout->addWidget(new QPushButton("Open"), 1, 1);
 	mainLayout->addWidget(new QPushButton("Save"), 1, 2);
 	mainLayout->addWidget(new QPushButton("Save"), 1, 3);
 
 	setLayout(mainLayout);
-	modeChanged();
+	changeGuiMode();
 }
 
-void DoserWidget::modeChanged()
+void DoserWidget::changeGuiMode()
 {
 	SegmentationMode mode = static_cast<SegmentationMode>(
 		modeComboBox->currentData().toInt());
@@ -61,7 +52,7 @@ QGroupBox* DoserWidget::createSettingsGui()
 	modeComboBox->addItem("quick", QUICK_MODE);
 	modeComboBox->addItem("deep", DEEP_MODE);
 	modeComboBox->addItem("deep & quick", BOTH_MODE);
-	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(modeChanged()));
+	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeGuiMode()));
 
 	QGridLayout* settingsLayout = new QGridLayout;
 	settingsLayout->addWidget(new QLabel("Mode:"), 0, 0);
@@ -76,6 +67,16 @@ QGroupBox* DoserWidget::createSettingsGui()
 
 QVector<QGroupBox*> DoserWidget::createGuiGroups()
 {
+	setStyleSheet("QGroupBox {"
+			"border: 1px solid gray;"
+			"border-radius: 3px;"
+			"margin-top: 1ex;"
+		"}"
+		"QGroupBox::title {"
+			"subcontrol-origin: margin;"
+			"left: 1ex;"
+		"}");
+
 	QVector<QGroupBox*> groups;
 	groups.push_back(createSettingsGui());
 

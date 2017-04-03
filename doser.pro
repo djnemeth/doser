@@ -13,8 +13,10 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
 	dosermainwindow.cpp \
-	doserwidget.cpp
+	doserwidget.cpp \
+	dosermodel.cpp
 
 HEADERS += dosermainwindow.h \
-	doserwidget.h
+	doserwidget.h \
+	dosermodel.h
 
