@@ -11,10 +11,12 @@ class DoserModel : public QObject
 
 public:
 	DoserModel();
-	void openImage(QString path);
 
 signals:
 	void imageChanged(const QImage&);
+
+public slots:
+	void openImage(const QString& path);
 
 private:
 	QImage image;

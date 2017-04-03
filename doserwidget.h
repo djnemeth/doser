@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QMap>
+#include <QThread>
 #include <QVector>
 #include <QWidget>
 
@@ -29,9 +30,11 @@ public:
 	static const int DEEP_GROUP_COLUMN_INDEX = 2;
 	static const int QUICK_GROUP_COLUMN_INDEX = 3;
 
-	explicit DoserWidget(QWidget *parent = nullptr);
+	explicit DoserWidget(QWidget* parent = nullptr);
+	~DoserWidget();
 
 signals:
+	void openImage(const QString& path);
 
 private slots:
 	void changeGuiMode();
@@ -43,7 +46,8 @@ private:
 	QVector<QGroupBox*> createGuiGroups();
 	void displayGridColumn(int column, bool isVisible);
 
-	DoserModel model;
+	DoserModel* model;
+	QThread modelThread;
 	QGridLayout* mainLayout;
 	QComboBox* modeComboBox;
 	QMap<ImageLabelType, QLabel*> imageLabels;

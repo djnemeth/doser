@@ -5,7 +5,7 @@ DoserModel::DoserModel()
 
 }
 
-void DoserModel::openImage(QString path)
+void DoserModel::openImage(const QString& path)
 {
 	QImage newImage(path);
 	if (!newImage.isNull())

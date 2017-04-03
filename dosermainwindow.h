@@ -9,7 +9,7 @@ class DoserMainWindow : public QMainWindow
 	Q_OBJECT
 
 public:
-	DoserMainWindow(QWidget *parent = nullptr);
+	DoserMainWindow(QWidget* parent = nullptr);
 	~DoserMainWindow();
 
 	DoserWidget* view;

@@ -10,8 +10,12 @@
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
-	connect(&model, SIGNAL(imageChanged(const QImage&)),
-			this, SLOT(imageChanged(const QImage&)));
+	model = new DoserModel;
+	model->moveToThread(&modelThread);
+	connect(&modelThread, SIGNAL(finished()), model, SLOT(deleteLater()));
+	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
+	connect(this, SIGNAL(openImage(QString)), model, SLOT(openImage(QString)));
+	modelThread.start();
 
 	QVector<QGroupBox*> groups = createGuiGroups();
 
@@ -32,6 +36,12 @@ DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 
 	setLayout(mainLayout);
 	changeGuiMode();
+}
+
+DoserWidget::~DoserWidget()
+{
+	modelThread.quit();
+	modelThread.wait();
 }
 
 void DoserWidget::changeGuiMode()
@@ -58,7 +68,7 @@ void DoserWidget::openImage()
 		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
 	if (!imagePath.isEmpty() && !imagePath.isNull())
 	{
-		model.openImage(imagePath);
+		emit openImage(imagePath);
 	}
 }
 
