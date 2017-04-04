@@ -6,6 +6,8 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QMap>
+#include <QProgressBar>
+#include <QPushButton>
 #include <QThread>
 #include <QVector>
 #include <QWidget>
@@ -35,6 +37,7 @@ public:
 
 signals:
 	void openImage(const QString& path);
+	void status(const QString& message);
 
 private slots:
 	void changeGuiMode();
@@ -42,15 +45,23 @@ private slots:
 	void openImage();
 
 private:
+	void setupModel();
+	void setupUi();
 	QGroupBox* createSettingsGui();
 	QVector<QGroupBox*> createGuiGroups();
 	void displayGridColumn(int column, bool isVisible);
 
 	DoserModel* model;
 	QThread modelThread;
-	QGridLayout* mainLayout;
+
+	QGridLayout* gridLayout;
 	QComboBox* modeComboBox;
 	QMap<ImageLabelType, QLabel*> imageLabels;
+
+	QPushButton* openButton;
+
+	QProgressBar* mainProgressBar;
+	QProgressBar* subProgressBar;
 };
 
 #endif // DOSERWIDGET_H

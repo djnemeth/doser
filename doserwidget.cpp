@@ -5,37 +5,17 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QLayout>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QString>
+#include <QVBoxLayout>
+
+#include <QDebug>
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
-	model = new DoserModel;
-	model->moveToThread(&modelThread);
-	connect(&modelThread, SIGNAL(finished()), model, SLOT(deleteLater()));
-	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
-	connect(this, SIGNAL(openImage(QString)), model, SLOT(openImage(QString)));
-	modelThread.start();
-
-	QVector<QGroupBox*> groups = createGuiGroups();
-
-	mainLayout = new QGridLayout;
-	mainLayout->addWidget(groups[0], 0, 0);
-	mainLayout->addWidget(groups[1], 0, 1);
-	mainLayout->addWidget(groups[2], 0, 2);
-	mainLayout->addWidget(groups[3], 0, 3);
-
-	mainLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
-
-	QPushButton* openButton = new QPushButton("Open");
-	connect(openButton, SIGNAL(clicked(bool)), this, SLOT(openImage()));
-	mainLayout->addWidget(openButton, 1, 1);
-
-	mainLayout->addWidget(new QPushButton("Save"), 1, 2);
-	mainLayout->addWidget(new QPushButton("Save"), 1, 3);
-
-	setLayout(mainLayout);
-	changeGuiMode();
+	setupModel();
+	setupUi();
 }
 
 DoserWidget::~DoserWidget()
@@ -60,6 +40,10 @@ void DoserWidget::imageChanged(const QImage& image)
 {
 	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(image));
 	imageLabels[SOURCE_LABEL]->setScaledContents(true);
+
+	mainProgressBar->setMaximum(100);
+	emit status("Image successfully opened.");
+	openButton->setEnabled(true);
 }
 
 void DoserWidget::openImage()
@@ -68,15 +52,79 @@ void DoserWidget::openImage()
 		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
 	if (!imagePath.isEmpty() && !imagePath.isNull())
 	{
+		openButton->setEnabled(false);
+		emit status("Opening image...");
+		mainProgressBar->setMaximum(0);
+
 		emit openImage(imagePath);
 	}
 }
 
+void DoserWidget::setupModel()
+{
+	model = new DoserModel;
+	model->moveToThread(&modelThread);
+
+	connect(&modelThread, SIGNAL(finished()), model, SLOT(deleteLater()));
+	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
+	connect(this, SIGNAL(openImage(QString)), model, SLOT(openImage(QString)));
+
+	modelThread.start();
+}
+
+void DoserWidget::setupUi()
+{
+	QVector<QGroupBox*> groups = createGuiGroups();
+
+	gridLayout = new QGridLayout;
+	gridLayout->addWidget(groups[0], 0, 0);
+	gridLayout->addWidget(groups[1], 0, 1);
+	gridLayout->addWidget(groups[2], 0, 2);
+	gridLayout->addWidget(groups[3], 0, 3);
+
+	openButton = new QPushButton("Open");
+	connect(openButton, SIGNAL(clicked(bool)), this, SLOT(openImage()));
+
+	gridLayout->addWidget(openButton, 1, 1);
+	gridLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
+	gridLayout->addWidget(new QPushButton("Save"), 1, 2);
+	gridLayout->addWidget(new QPushButton("Save"), 1, 3);
+
+	auto initProgressBar = [](QProgressBar* bar)
+	{
+		bar->setRange(0, 100);
+		bar->setValue(0);
+		bar->setFixedHeight(18);
+	};
+
+	mainProgressBar = new QProgressBar;
+	subProgressBar = new QProgressBar;
+
+	initProgressBar(mainProgressBar);
+	initProgressBar(subProgressBar);
+	subProgressBar->setVisible(false);
+
+	QVBoxLayout* progressLayout = new QVBoxLayout;
+	progressLayout->addSpacing(5);
+	progressLayout->addWidget(mainProgressBar);
+	progressLayout->addWidget(subProgressBar);
+
+	QGroupBox* progressGroup = new QGroupBox("Progress");
+	progressGroup->setLayout(progressLayout);
+
+	QVBoxLayout* mainLayout = new QVBoxLayout;
+	mainLayout->addLayout(gridLayout);
+	mainLayout->addWidget(progressGroup);
+	setLayout(mainLayout);
+
+	changeGuiMode();
+}
+
 void DoserWidget::displayGridColumn(int column, bool isVisible)
 {
-	for (int i = 0; i < mainLayout->rowCount(); ++i)
+	for (int i = 0; i < gridLayout->rowCount(); ++i)
 	{
-		mainLayout->itemAtPosition(i, column)->widget()->setVisible(isVisible);
+		gridLayout->itemAtPosition(i, column)->widget()->setVisible(isVisible);
 	}
 }
 
