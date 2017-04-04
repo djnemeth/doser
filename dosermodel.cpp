@@ -33,11 +33,10 @@ void DoserModel::segment(SegmentationMode mode)
 		}
 	}
 
-	NodeVector prevNodes;
 	double dist;
 	do
 	{
-		prevNodes = nodes;
+		NodeVector prevNodes(nodes);
 		iterate(nodes);
 		dist = distance(nodes, prevNodes);
 	} while (dist > ITERATION_PRECISION);
@@ -55,7 +54,7 @@ void DoserModel::segment(SegmentationMode mode)
 	isSegmenting = false;
 }
 
-double DoserModel::product(QVector<double> v1, QVector<double> v2) const
+double DoserModel::product(NodeVector v1, QVector<double> v2) const
 {
 	if (v1.size() != v2.size())
 	{
@@ -65,7 +64,7 @@ double DoserModel::product(QVector<double> v1, QVector<double> v2) const
 	double prod = 0;
 	for (int i = 0; i < v1.size(); ++i)
 	{
-		prod += v1[i] * v2[i];
+		prod += v1[i].second * v2[i];
 	}
 
 	return prod;
@@ -112,9 +111,9 @@ void DoserModel::iterate(NodeVector& nodes)
 		}
 	}
 
-	double overallFitness = product(fitnesses, fitnesses);
+	double overallFitness = product(nodes, fitnesses);
 	for (int i = 0; i < nodes.size(); ++i)
 	{
-		nodes[i].second = fitnesses[i] / overallFitness;
+		nodes[i].second *= fitnesses[i] / overallFitness;
 	}
 }
