@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QImage>
 #include <QLabel>
 #include <QLayout>
 #include <QProgressBar>
@@ -10,12 +11,10 @@
 #include <QString>
 #include <QVBoxLayout>
 
-#include <QDebug>
-
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
 	setupModel();
-	setupUi();
+	setupGui();
 }
 
 DoserWidget::~DoserWidget()
@@ -26,9 +25,7 @@ DoserWidget::~DoserWidget()
 
 void DoserWidget::changeGuiMode()
 {
-	SegmentationMode mode = static_cast<SegmentationMode>(
-		modeComboBox->currentData().toInt());
-
+	SegmentationMode mode = currentMode();
 	bool isQuickVisible = mode == QUICK_MODE || mode == BOTH_MODE;
 	bool isDeepVisible = mode == DEEP_MODE || mode == BOTH_MODE;
 
@@ -36,14 +33,32 @@ void DoserWidget::changeGuiMode()
 	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
 }
 
+void DoserWidget::drawSegment(const QVector<QPoint>& segment)
+{
+	QImage deepImage = image;
+	for (QPoint p : segment)
+	{
+		deepImage.setPixelColor(p, QColor(255, 0, 0));
+	}
+
+	imageLabels[DEEP_LABEL]->setPixmap(QPixmap::fromImage(deepImage));
+	imageLabels[DEEP_LABEL]->setScaledContents(true);
+
+	mainProgressBar->setMaximum(100);
+	emit status("Image successfully segmented.");
+	setButtonsEnabled(true);
+}
+
 void DoserWidget::imageChanged(const QImage& image)
 {
+	this->image = image;
+
 	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(image));
 	imageLabels[SOURCE_LABEL]->setScaledContents(true);
 
 	mainProgressBar->setMaximum(100);
 	emit status("Image successfully opened.");
-	openButton->setEnabled(true);
+	setButtonsEnabled(true);
 }
 
 void DoserWidget::openImage()
@@ -52,12 +67,33 @@ void DoserWidget::openImage()
 		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
 	if (!imagePath.isEmpty() && !imagePath.isNull())
 	{
-		openButton->setEnabled(false);
+		setButtonsEnabled(false);
 		emit status("Opening image...");
 		mainProgressBar->setMaximum(0);
 
-		emit openImage(imagePath);
+		emit doOpenImage(imagePath);
 	}
+}
+
+void DoserWidget::segment()
+{
+	setButtonsEnabled(false);
+	emit status("Segmenting image...");
+	mainProgressBar->setMaximum(0);
+	emit doSegment(currentMode());
+}
+
+SegmentationMode DoserWidget::currentMode() const
+{
+	return static_cast<SegmentationMode>(modeComboBox->currentData().toInt());
+}
+
+void DoserWidget::setButtonsEnabled(bool enabled)
+{
+	segmentButton->setEnabled(enabled && !image.isNull());
+	openButton->setEnabled(enabled);
+	saveQuickButton->setEnabled(enabled);
+	saveDeepButton->setEnabled(enabled);
 }
 
 void DoserWidget::setupModel()
@@ -65,14 +101,19 @@ void DoserWidget::setupModel()
 	model = new DoserModel;
 	model->moveToThread(&modelThread);
 
+	qRegisterMetaType<QVector<QPoint>>("QVector<QPoint>");
+	qRegisterMetaType<SegmentationMode>("SegmentationMode");
+
 	connect(&modelThread, SIGNAL(finished()), model, SLOT(deleteLater()));
+	connect(this, SIGNAL(doOpenImage(QString)), model, SLOT(openImage(QString)));
 	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
-	connect(this, SIGNAL(openImage(QString)), model, SLOT(openImage(QString)));
+	connect(this, SIGNAL(doSegment(SegmentationMode)), model, SLOT(segment(SegmentationMode)));
+	connect(model, SIGNAL(deepSegmentChanged(QVector<QPoint>)), this, SLOT(drawSegment(QVector<QPoint>)));
 
 	modelThread.start();
 }
 
-void DoserWidget::setupUi()
+void DoserWidget::setupGui()
 {
 	QVector<QGroupBox*> groups = createGuiGroups();
 
@@ -82,19 +123,26 @@ void DoserWidget::setupUi()
 	gridLayout->addWidget(groups[2], 0, 2);
 	gridLayout->addWidget(groups[3], 0, 3);
 
+	segmentButton = new QPushButton("Segmentation");
+	connect(segmentButton, SIGNAL(clicked(bool)), this, SLOT(segment()));
+
 	openButton = new QPushButton("Open");
 	connect(openButton, SIGNAL(clicked(bool)), this, SLOT(openImage()));
 
+	saveQuickButton = new QPushButton("Save");
+	saveDeepButton = new QPushButton("Save");
+
 	gridLayout->addWidget(openButton, 1, 1);
-	gridLayout->addWidget(new QPushButton("Segmentation"), 1, 0);
-	gridLayout->addWidget(new QPushButton("Save"), 1, 2);
-	gridLayout->addWidget(new QPushButton("Save"), 1, 3);
+	gridLayout->addWidget(segmentButton, 1, 0);
+	gridLayout->addWidget(saveQuickButton, 1, 2);
+	gridLayout->addWidget(saveDeepButton, 1, 3);
 
 	auto initProgressBar = [](QProgressBar* bar)
 	{
 		bar->setRange(0, 100);
 		bar->setValue(0);
 		bar->setFixedHeight(18);
+		bar->setTextVisible(false);
 	};
 
 	mainProgressBar = new QProgressBar;
@@ -118,6 +166,7 @@ void DoserWidget::setupUi()
 	setLayout(mainLayout);
 
 	changeGuiMode();
+	setButtonsEnabled(true);
 }
 
 void DoserWidget::displayGridColumn(int column, bool isVisible)
@@ -134,6 +183,7 @@ QGroupBox* DoserWidget::createSettingsGui()
 	modeComboBox->addItem("quick", QUICK_MODE);
 	modeComboBox->addItem("deep", DEEP_MODE);
 	modeComboBox->addItem("deep & quick", BOTH_MODE);
+	modeComboBox->setCurrentIndex(1);
 	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeGuiMode()));
 
 	QGridLayout* settingsLayout = new QGridLayout;

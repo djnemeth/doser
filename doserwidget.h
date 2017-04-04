@@ -4,8 +4,10 @@
 #include <QComboBox>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QImage>
 #include <QLabel>
 #include <QMap>
+#include <QPoint>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QThread>
@@ -13,11 +15,6 @@
 #include <QWidget>
 
 #include "dosermodel.h"
-
-enum SegmentationMode
-{
-	QUICK_MODE, DEEP_MODE, BOTH_MODE
-};
 
 enum ImageLabelType
 {
@@ -36,29 +33,38 @@ public:
 	~DoserWidget();
 
 signals:
-	void openImage(const QString& path);
+	void doSegment(SegmentationMode);
+	void doOpenImage(const QString& path);
 	void status(const QString& message);
 
 private slots:
 	void changeGuiMode();
+	void drawSegment(const QVector<QPoint>& segment);
 	void imageChanged(const QImage& image);
 	void openImage();
+	void segment();
 
 private:
+	SegmentationMode currentMode() const;
+	void setButtonsEnabled(bool enabled);
 	void setupModel();
-	void setupUi();
+	void setupGui();
 	QGroupBox* createSettingsGui();
 	QVector<QGroupBox*> createGuiGroups();
 	void displayGridColumn(int column, bool isVisible);
 
 	DoserModel* model;
 	QThread modelThread;
+	QImage image;
 
 	QGridLayout* gridLayout;
 	QComboBox* modeComboBox;
 	QMap<ImageLabelType, QLabel*> imageLabels;
 
+	QPushButton* segmentButton;
 	QPushButton* openButton;
+	QPushButton* saveQuickButton;
+	QPushButton* saveDeepButton;
 
 	QProgressBar* mainProgressBar;
 	QProgressBar* subProgressBar;
