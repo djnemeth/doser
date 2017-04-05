@@ -1,5 +1,5 @@
 #include "dosermodel.h"
-#include <QFutureSynchronizer>
+#include <QFuture>
 #include <QPoint>
 #include <QtConcurrent/QtConcurrent>
 #include <QtMath>
@@ -110,25 +110,31 @@ double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
 
 void DoserModel::iterate(NodeVector& nodes)
 {
-	QVector<double> fitnesses(nodes.size(), 0);
-	QFutureSynchronizer<void> fitnessSynchronizer;
-
+	QVector<QFuture<QPair<int, double>>> futureFitnesses(nodes.size());
 	for (int i = 0; i < nodes.size(); ++i)
 	{
-		auto setCurrentFitness = [&, i]()
+		auto calculateIthFitness = [=]()
 		{
+			double fitness = 0;
 			for (int j = 0; j < nodes.size(); ++j)
 			{
-				fitnesses[i] += nodes[j].second * weight(nodes[i].first, nodes[j].first);
+				 fitness += nodes[j].second * weight(nodes[i].first, nodes[j].first);
 			}
+
+			return qMakePair(i, fitness);
 		};
 
-		fitnessSynchronizer.addFuture(QtConcurrent::run(setCurrentFitness));
+		futureFitnesses[i] = QtConcurrent::run(calculateIthFitness);
 	}
 
-	fitnessSynchronizer.waitForFinished();
-	double overallFitness = product(nodes, fitnesses);
+	QVector<double> fitnesses(nodes.size(), 0);
+	for (QFuture<QPair<int, double>> future : futureFitnesses)
+	{
+		QPair<int, double> fitness = future.result();
+		fitnesses[fitness.first] = fitness.second;
+	}
 
+	double overallFitness = product(nodes, fitnesses);
 	for (int i = 0; i < nodes.size(); ++i)
 	{
 		nodes[i].second *= fitnesses[i] / overallFitness;
