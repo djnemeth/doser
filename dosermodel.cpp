@@ -25,11 +25,12 @@ void DoserModel::segment(SegmentationMode mode)
 	double initialWeight = 1.0 / pixelCount;
 
 	NodeVector nodes;
-	for (int x = 0; x < image.width(); ++x)
+	nodes.reserve(pixelCount);
+	for (int y = 0; y < image.height(); ++y)
 	{
-		for (int y = 0; y < image.height(); ++y)
+		for (int x = 0; x < image.width(); ++x)
 		{
-			nodes.push_back(qMakePair(QPoint(x, y), initialWeight));
+			nodes.append(qMakePair(QPoint(x, y), initialWeight));
 		}
 	}
 
@@ -42,11 +43,12 @@ void DoserModel::segment(SegmentationMode mode)
 	} while (dist > ITERATION_PRECISION);
 
 	QVector<QPoint> segment;
+	segment.reserve(nodes.size());
 	for (QPair<QPoint, double> node : nodes)
 	{
 		if (node.second > initialWeight)
 		{
-			segment.push_back(node.first);
+			segment.append(node.first);
 		}
 	}
 
@@ -54,7 +56,7 @@ void DoserModel::segment(SegmentationMode mode)
 	isSegmenting = false;
 }
 
-double DoserModel::product(NodeVector v1, QVector<double> v2) const
+double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) const
 {
 	if (v1.size() != v2.size())
 	{
@@ -70,10 +72,10 @@ double DoserModel::product(NodeVector v1, QVector<double> v2) const
 	return prod;
 }
 
-double DoserModel::weight(QPoint px1, QPoint px2) const
+double DoserModel::weight(const QPoint& px1, const QPoint& px2) const
 {
 	// todo: HSV
-	auto toGrayscale = [](const QImage& image, QPoint px) -> double
+	static auto toGrayscale = [](const QImage& image, const QPoint& px) -> double
 	{
 		return qGray(image.pixel(px)) / 255.0;
 	};
@@ -84,7 +86,7 @@ double DoserModel::weight(QPoint px1, QPoint px2) const
 	return qExp(-distance / WEIGHT_RATIO);
 }
 
-double DoserModel::distance(NodeVector v1, NodeVector v2) const
+double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
 {
 	if (v1.size() != v2.size())
 	{
@@ -97,7 +99,7 @@ double DoserModel::distance(NodeVector v1, NodeVector v2) const
 		sumOfSquares += qPow(v1[i].second - v2[i].second, 2);
 	}
 
-	return qPow(sumOfSquares, 0.5);
+	return qSqrt(sumOfSquares);
 }
 
 void DoserModel::iterate(NodeVector& nodes)

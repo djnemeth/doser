@@ -26,12 +26,13 @@ public slots:
 
 private:
 	typedef QVector<QPair<QPoint, double>> NodeVector;
+
 	static constexpr double ITERATION_PRECISION = 0.01;
 	static constexpr double WEIGHT_RATIO = 0.1;
 
-	double weight(QPoint px1, QPoint px2) const;
-	double distance(NodeVector v1, NodeVector v2) const;
-	double product(NodeVector v1, QVector<double> v2) const;
+	double weight(const QPoint& px1, const QPoint& px2) const;
+	double distance(const NodeVector& v1, const NodeVector& v2) const;
+	double product(const NodeVector& v1, const QVector<double>& v2) const;
 	void iterate(NodeVector& nodes);
 
 	QImage image;
