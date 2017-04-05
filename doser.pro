@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT += core gui
+QT += core gui concurrent
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -18,5 +18,4 @@ SOURCES += main.cpp\
 
 HEADERS += dosermainwindow.h \
 	doserwidget.h \
-	dosermodel.h
-
+	dosermodel.h \
