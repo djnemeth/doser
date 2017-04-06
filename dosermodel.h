@@ -17,8 +17,9 @@ class DoserModel : public QObject
 	Q_OBJECT
 
 signals:
-	void imageChanged(const QImage&);
 	void deepSegmentChanged(QVector<QPoint>);
+	void imageChanged(const QImage&);
+	void iterationProgress(int current, int max);
 
 public slots:
 	void openImage(const QString& path);
@@ -33,7 +34,7 @@ private:
 	double weight(const QPoint& px1, const QPoint& px2) const;
 	double distance(const NodeVector& v1, const NodeVector& v2) const;
 	double product(const NodeVector& v1, const QVector<double>& v2) const;
-	void iterate(NodeVector& nodes);
+	void iterate(NodeVector& races);
 
 	QImage image;
 	bool isSegmenting = false;

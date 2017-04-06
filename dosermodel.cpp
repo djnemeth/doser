@@ -50,7 +50,7 @@ void DoserModel::segment(SegmentationMode mode)
 	} while (dist > ITERATION_PRECISION);
 
 	QVector<QPoint> segment;
-	for (QPair<QPoint, double> node : nodes)
+	for (const QPair<QPoint, double>& node : nodes)
 	{
 		if (node.second > initialWeight)
 		{
@@ -81,7 +81,7 @@ double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) cons
 double DoserModel::weight(const QPoint& px1, const QPoint& px2) const
 {
 	// todo: HSV
-	auto toGrayscale = [&](const QPoint& px)
+	const auto& toGrayscale = [&](const QPoint& px)
 	{
 		return qGray(image.pixel(px)) / 255.0;
 	};
@@ -108,35 +108,39 @@ double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
 	return qSqrt(sumOfSquares);
 }
 
-void DoserModel::iterate(NodeVector& nodes)
+void DoserModel::iterate(NodeVector& races)
 {
-	QVector<QFuture<QPair<int, double>>> futureFitnesses(nodes.size());
-	for (int i = 0; i < nodes.size(); ++i)
+	int raceCount = races.size();
+	QVector<QFuture<QPair<int, double>>> futures(raceCount);
+
+	for (int i = 0; i < raceCount; ++i)
 	{
 		auto calculateIthFitness = [=]()
 		{
 			double fitness = 0;
-			for (int j = 0; j < nodes.size(); ++j)
+			for (const QPair<QPoint, double>& rival : races)
 			{
-				 fitness += nodes[j].second * weight(nodes[i].first, nodes[j].first);
+				 fitness += rival.second * weight(races[i].first, rival.first);
 			}
 
 			return qMakePair(i, fitness);
 		};
 
-		futureFitnesses[i] = QtConcurrent::run(calculateIthFitness);
+		futures[i] = QtConcurrent::run(calculateIthFitness);
 	}
 
-	QVector<double> fitnesses(nodes.size(), 0);
-	for (QFuture<QPair<int, double>> future : futureFitnesses)
+	QVector<double> fitnesses(raceCount, 0);
+	for (int i = 0; i < raceCount; ++i)
 	{
-		QPair<int, double> fitness = future.result();
+		const QPair<int, double>& fitness = futures[i].result();
 		fitnesses[fitness.first] = fitness.second;
+
+		emit iterationProgress(i + 1, raceCount);
 	}
 
-	double overallFitness = product(nodes, fitnesses);
-	for (int i = 0; i < nodes.size(); ++i)
+	double overallFitness = product(races, fitnesses);
+	for (int i = 0; i < raceCount; ++i)
 	{
-		nodes[i].second *= fitnesses[i] / overallFitness;
+		races[i].second *= fitnesses[i] / overallFitness;
 	}
 }

@@ -41,6 +41,7 @@ private slots:
 	void changeGuiMode();
 	void drawSegment(const QVector<QPoint>& segment);
 	void imageChanged(const QImage& image);
+	void iterationProgressChanged(int current, int max);
 	void openImage();
 	void segment();
 
