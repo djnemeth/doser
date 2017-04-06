@@ -29,7 +29,8 @@ private:
 	typedef QVector<QPair<QPoint, double>> NodeVector;
 
 	static constexpr double ITERATION_PRECISION = 0.01;
-	static constexpr double WEIGHT_RATIO = 0.1;
+	static constexpr double WEIGHT_RATIO_SQUARE = 0.01;
+	static const bool FORCE_GRAYSCALE = true;
 
 	double weight(const QPoint& px1, const QPoint& px2) const;
 	double distance(const NodeVector& v1, const NodeVector& v2) const;
@@ -37,6 +38,7 @@ private:
 	void iterate(NodeVector& races);
 
 	QImage image;
+	bool isGrayscale;
 	bool isSegmenting = false;
 };
 

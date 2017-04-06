@@ -16,6 +16,7 @@ void DoserModel::openImage(const QString& path)
 	if (!newImage.isNull())
 	{
 		image = newImage;
+		isGrayscale = image.isGrayscale(); // expensive call
 		emit imageChanged(image);
 	}
 }
@@ -80,16 +81,29 @@ double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) cons
 
 double DoserModel::weight(const QPoint& px1, const QPoint& px2) const
 {
-	// todo: HSV
-	const auto& toGrayscale = [&](const QPoint& px)
+	QRgb rgb1 = image.pixel(px1);
+	QRgb rgb2 = image.pixel(px2);
+
+	double squareSum;
+	if (isGrayscale || FORCE_GRAYSCALE)
 	{
-		return qGray(image.pixel(px)) / 255.0;
-	};
+		squareSum = qPow((qGray(rgb1) - qGray(rgb2)) / 255.0, 2);
+	}
+	else
+	{
+		QColor hsv1 = QColor(rgb1).toHsv();
+		QColor hsv2 = QColor(rgb2).toHsv();
 
-	double colorDiff = toGrayscale(px1) - toGrayscale(px2);
-	double distance = qPow(colorDiff, 2);
+		double h1 = hsv1.hueF(), v1 = hsv1.valueF();
+		double h2 = hsv2.hueF(), v2 = hsv2.valueF();
+		double vs1 = v1 * hsv1.saturationF(), vs2 = v2 * hsv2.saturationF();
 
-	return qExp(-distance / WEIGHT_RATIO);
+		squareSum = qPow(v1 - v2, 2);
+		squareSum += qPow(vs1 * qSin(h1) - vs2 * qSin(h2), 2);
+		squareSum += qPow(vs1 * qCos(h1) - vs2 * qCos(h2), 2);
+	}
+
+	return qExp(-squareSum / WEIGHT_RATIO_SQUARE);
 }
 
 double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
