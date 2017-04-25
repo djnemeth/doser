@@ -40,10 +40,12 @@ signals:
 private slots:
 	void changeGuiMode();
 	void drawSegment(const QVector<QPoint>& segment);
-	void imageChanged(const QImage& image);
+	void imageChanged(const QImage& sourceImage);
 	void iterationProgressChanged(int current, int max);
 	void openImage();
 	void segment();
+	void segmentationFinished();
+	void segmentationProgressChanged(int current, int max);
 
 private:
 	SegmentationMode currentMode() const;
@@ -56,7 +58,8 @@ private:
 
 	DoserModel* model;
 	QThread modelThread;
-	QImage image;
+	QImage sourceImage;
+	QImage deepImage;
 
 	QGridLayout* gridLayout;
 	QComboBox* modeComboBox;

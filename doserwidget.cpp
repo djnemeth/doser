@@ -9,12 +9,14 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QString>
+#include <QTime>
 #include <QVBoxLayout>
 
 DoserWidget::DoserWidget(QWidget *parent) : QWidget(parent)
 {
 	setupModel();
 	setupGui();
+	qsrand(QTime::currentTime().msec());
 }
 
 DoserWidget::~DoserWidget()
@@ -35,27 +37,22 @@ void DoserWidget::changeGuiMode()
 
 void DoserWidget::drawSegment(const QVector<QPoint>& segment)
 {
-	QImage deepImage = image;
+	QColor randomColor = QColor(qrand() % 255, qrand() % 255, qrand() % 255);
+
 	for (QPoint p : segment)
 	{
-		deepImage.setPixelColor(p, QColor(255, 0, 0));
+		deepImage.setPixelColor(p, randomColor);
 	}
 
 	imageLabels[DEEP_LABEL]->setPixmap(QPixmap::fromImage(deepImage));
-
-	mainProgressBar->setMaximum(100);
-	subProgressBar->setFormat("Current iteration");
 	subProgressBar->setValue(0);
-
-	emit status("Image successfully segmented.");
-	setButtonsEnabled(true);
 }
 
 void DoserWidget::imageChanged(const QImage& image)
 {
-	this->image = image;
+	sourceImage = image;
 
-	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(image));
+	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(sourceImage));
 	imageLabels[DEEP_LABEL]->setText("Deep segments\nnot yet computed.");
 
 	emit status("Image successfully opened.");
@@ -84,10 +81,28 @@ void DoserWidget::segment()
 	setButtonsEnabled(false);
 	emit status("Segmenting image...");
 
-	mainProgressBar->setMaximum(0);
+	deepImage = sourceImage;
+	imageLabels[DEEP_LABEL]->setPixmap(QPixmap::fromImage(deepImage));
+
+	mainProgressBar->setFormat("Total segmentation: %p%");
 	subProgressBar->setFormat("Current iteration: %p%");
 
 	emit doSegment(currentMode());
+}
+
+void DoserWidget::segmentationFinished()
+{
+	mainProgressBar->setValue(0);
+	mainProgressBar->setFormat("Total segmentation");
+	subProgressBar->setFormat("Current iteration");
+
+	emit status("Image successfully segmented.");
+	setButtonsEnabled(true);
+}
+
+void DoserWidget::segmentationProgressChanged(int current, int max)
+{
+	mainProgressBar->setValue(current * 100 / max);
 }
 
 SegmentationMode DoserWidget::currentMode() const
@@ -97,7 +112,7 @@ SegmentationMode DoserWidget::currentMode() const
 
 void DoserWidget::setButtonsEnabled(bool enabled)
 {
-	segmentButton->setEnabled(enabled && !image.isNull());
+	segmentButton->setEnabled(enabled && !sourceImage.isNull());
 	openButton->setEnabled(enabled);
 	saveQuickButton->setEnabled(enabled);
 	saveDeepButton->setEnabled(enabled);
@@ -117,6 +132,8 @@ void DoserWidget::setupModel()
 	connect(this, SIGNAL(doSegment(SegmentationMode)), model, SLOT(segment(SegmentationMode)));
 	connect(model, SIGNAL(deepSegmentChanged(QVector<QPoint>)), this, SLOT(drawSegment(QVector<QPoint>)));
 	connect(model, SIGNAL(iterationProgress(int,int)), this, SLOT(iterationProgressChanged(int,int)));
+	connect(model, SIGNAL(segmentationFinished()), this, SLOT(segmentationFinished()));
+	connect(model, SIGNAL(segmentationProgress(int,int)), this, SLOT(segmentationProgressChanged(int,int)));
 
 	modelThread.start();
 }
@@ -145,15 +162,15 @@ void DoserWidget::setupGui()
 	gridLayout->addWidget(saveQuickButton, 1, 2);
 	gridLayout->addWidget(saveDeepButton, 1, 3);
 
+	mainProgressBar = new QProgressBar;
+	subProgressBar = new QProgressBar;
+
 	const static auto& initProgressBar = [](QProgressBar* bar)
 	{
 		bar->setRange(0, 100);
 		bar->setValue(0);
 		bar->setFixedHeight(18);
 	};
-
-	mainProgressBar = new QProgressBar;
-	subProgressBar = new QProgressBar;
 
 	initProgressBar(mainProgressBar);
 	initProgressBar(subProgressBar);

@@ -42,25 +42,59 @@ void DoserModel::segment(SegmentationMode mode)
 		}
 	}
 
-	double dist;
-	do
+	int segmentedPixelCount = 0;
+	int targetPixelCount = TARGET_SEGMENTATION_RATIO * pixelCount;
+	while (segmentedPixelCount < targetPixelCount)
 	{
-		NodeVector prevNodes(nodes);
-		iterate(nodes);
-		dist = distance(nodes, prevNodes);
-	} while (dist > ITERATION_PRECISION);
-
-	QVector<QPoint> segment;
-	for (const QPair<QPoint, double>& node : nodes)
-	{
-		if (node.second > initialWeight)
+		double dist;
+		do
 		{
-			segment.append(node.first);
+			NodeVector prevNodes(nodes);
+			iterate(nodes);
+			dist = distance(nodes, prevNodes);
+		} while (dist > ITERATION_PRECISION);
+
+		QVector<QPoint> segment;
+		NodeVector newNodes;
+
+		for (const QPair<QPoint, double>& node : nodes)
+		{
+			if (node.second > initialWeight)
+			{
+				segment.append(node.first);
+			}
+			else
+			{
+				newNodes.append(node);
+			}
 		}
+
+		if (segment.empty())
+		{
+			segmentedPixelCount = pixelCount;
+			for (const QPair<QPoint, double>& node : nodes)
+			{
+				segment.append(node.first);
+			}
+		}
+		else
+		{
+			segmentedPixelCount += segment.size();
+			nodes = newNodes;
+
+			initialWeight = 1.0 / nodes.size();
+			for (int i = 0; i < nodes.size(); ++i)
+			{
+				nodes[i].second = initialWeight;
+			}
+		}
+
+		emit segmentationProgress(segmentedPixelCount, pixelCount);
+		emit deepSegmentChanged(segment);
 	}
 
-	emit deepSegmentChanged(segment);
 	isSegmenting = false;
+	emit segmentationFinished();
 }
 
 double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) const
