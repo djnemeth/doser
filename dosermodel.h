@@ -3,6 +3,7 @@
 
 #include <QImage>
 #include <QObject>
+#include <QMap>
 #include <QPair>
 #include <QPoint>
 #include <QString>
@@ -16,8 +17,14 @@ class DoserModel : public QObject
 {
 	Q_OBJECT
 
+public:
+	typedef QPoint Pixel;
+	typedef QVector<Pixel> Segment;
+	typedef QPair<Pixel, double> Node;
+	DoserModel();
+
 signals:
-	void deepSegmentChanged(QVector<QPoint>);
+	void deepSegmentChanged(DoserModel::Segment);
 	void imageChanged(const QImage&);
 	void iterationProgress(int current, int max);
 	void segmentationFinished();
@@ -28,21 +35,23 @@ public slots:
 	void segment(SegmentationMode mode);
 
 private:
-	typedef QVector<QPair<QPoint, double>> NodeVector;
-
 	static constexpr double ITERATION_PRECISION = 0.01;
 	static constexpr double WEIGHT_RATIO_SQUARE = 0.01;
 	static constexpr double TARGET_SEGMENTATION_RATIO = 0.9;
+	static constexpr double MINIMAL_SEGMENT_SIZE = 15;
 	static const bool FORCE_GRAYSCALE = false;
 
-	double weight(const QPoint& px1, const QPoint& px2) const;
-	double distance(const NodeVector& v1, const NodeVector& v2) const;
-	double product(const NodeVector& v1, const QVector<double>& v2) const;
-	void iterate(NodeVector& races);
+	double weight(const Pixel& px1, const Pixel& px2) const;
+	double distance(const QVector<Node>& v1, const QVector<Node>& v2) const;
+	double product(const QVector<Node>& v1, const QVector<double>& v2) const;
+	void iterate(QVector<Node>& races);
+	void mergePendingPixels(SegmentationMode mode);
 
 	QImage image;
 	bool isGrayscale;
 	bool isSegmenting = false;
+	QMap<SegmentationMode, QVector<Segment>> segments;
+	QMap<SegmentationMode, QVector<Pixel>> pendingPixels;
 };
 
 #endif // DOSERMODEL_H

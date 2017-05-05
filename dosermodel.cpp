@@ -1,9 +1,13 @@
 #include "dosermodel.h"
 #include <QFuture>
-#include <QPoint>
 #include <QtConcurrent/QtConcurrent>
 #include <QtMath>
 #include <QVector>
+
+DoserModel::DoserModel()
+{
+	qRegisterMetaType<Segment>("DoserModel::Segment");
+}
 
 void DoserModel::openImage(const QString& path)
 {
@@ -29,16 +33,19 @@ void DoserModel::segment(SegmentationMode mode)
 	}
 
 	isSegmenting = true;
+	segments.clear();
+	pendingPixels.clear();
+
 	int pixelCount = image.width() * image.height();
 	double initialWeight = 1.0 / pixelCount;
 
-	NodeVector nodes;
+	QVector<Node> nodes;
 	nodes.reserve(pixelCount);
 	for (int y = 0; y < image.height(); ++y)
 	{
 		for (int x = 0; x < image.width(); ++x)
 		{
-			nodes.append(qMakePair(QPoint(x, y), initialWeight));
+			nodes.append(qMakePair(Pixel(x, y), initialWeight));
 		}
 	}
 
@@ -49,15 +56,15 @@ void DoserModel::segment(SegmentationMode mode)
 		double dist;
 		do
 		{
-			NodeVector prevNodes(nodes);
+			QVector<Node> prevNodes(nodes);
 			iterate(nodes);
 			dist = distance(nodes, prevNodes);
 		} while (dist > ITERATION_PRECISION);
 
-		QVector<QPoint> segment;
-		NodeVector newNodes;
+		Segment segment;
+		QVector<Node> newNodes;
 
-		for (const QPair<QPoint, double>& node : nodes)
+		for (const Node& node : nodes)
 		{
 			if (node.second > initialWeight)
 			{
@@ -69,19 +76,19 @@ void DoserModel::segment(SegmentationMode mode)
 			}
 		}
 
-		if (segment.empty())
+		if (segment.empty()) // iff nodes is atomic
 		{
-			segmentedPixelCount = pixelCount;
-			for (const QPair<QPoint, double>& node : nodes)
+			segment.resize(nodes.size());
+			for (int i = 0; i < nodes.size(); ++i)
 			{
-				segment.append(node.first);
+				segment[i] = nodes[i].first;
 			}
+
+			nodes.clear();
 		}
 		else
 		{
-			segmentedPixelCount += segment.size();
 			nodes = newNodes;
-
 			initialWeight = 1.0 / nodes.size();
 			for (int i = 0; i < nodes.size(); ++i)
 			{
@@ -89,15 +96,34 @@ void DoserModel::segment(SegmentationMode mode)
 			}
 		}
 
+		if (segment.size() < MINIMAL_SEGMENT_SIZE)
+		{
+			pendingPixels[mode].append(segment);
+		}
+		else
+		{
+			segments[mode].append(segment);
+			emit deepSegmentChanged(segment);
+		}
+
+		segmentedPixelCount += segment.size();
 		emit segmentationProgress(segmentedPixelCount, pixelCount);
-		emit deepSegmentChanged(segment);
 	}
 
+	if (!nodes.empty())
+	{
+		for (int i = 0; i < nodes.size(); ++i)
+		{
+			pendingPixels[mode].append(nodes[i].first);
+		}
+	}
+
+	mergePendingPixels(mode);
 	isSegmenting = false;
 	emit segmentationFinished();
 }
 
-double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) const
+double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) const
 {
 	if (v1.size() != v2.size())
 	{
@@ -113,7 +139,7 @@ double DoserModel::product(const NodeVector& v1, const QVector<double>& v2) cons
 	return product;
 }
 
-double DoserModel::weight(const QPoint& px1, const QPoint& px2) const
+double DoserModel::weight(const Pixel &px1, const Pixel &px2) const
 {
 	QRgb rgb1 = image.pixel(px1);
 	QRgb rgb2 = image.pixel(px2);
@@ -140,7 +166,7 @@ double DoserModel::weight(const QPoint& px1, const QPoint& px2) const
 	return qExp(-squareSum / WEIGHT_RATIO_SQUARE);
 }
 
-double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
+double DoserModel::distance(const QVector<Node>& v1, const QVector<Node>& v2) const
 {
 	if (v1.size() != v2.size())
 	{
@@ -156,7 +182,7 @@ double DoserModel::distance(const NodeVector& v1, const NodeVector& v2) const
 	return qSqrt(sumOfSquares);
 }
 
-void DoserModel::iterate(NodeVector& races)
+void DoserModel::iterate(QVector<Node>& races)
 {
 	int raceCount = races.size();
 	QVector<QFuture<QPair<int, double>>> futures(raceCount);
@@ -166,7 +192,7 @@ void DoserModel::iterate(NodeVector& races)
 		auto calculateIthFitness = [=]()
 		{
 			double fitness = 0;
-			for (const QPair<QPoint, double>& rival : races)
+			for (const Node& rival : races)
 			{
 				 fitness += rival.second * weight(races[i].first, rival.first);
 			}
@@ -190,5 +216,13 @@ void DoserModel::iterate(NodeVector& races)
 	for (int i = 0; i < raceCount; ++i)
 	{
 		races[i].second *= fitnesses[i] / overallFitness;
+	}
+}
+
+void DoserModel::mergePendingPixels(SegmentationMode mode)
+{
+	for (const Pixel& pixel : pendingPixels[mode])
+	{
+		// add the pixel to the most similar segment
 	}
 }

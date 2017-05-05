@@ -35,11 +35,11 @@ void DoserWidget::changeGuiMode()
 	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
 }
 
-void DoserWidget::drawSegment(const QVector<QPoint>& segment)
+void DoserWidget::drawSegment(const DoserModel::Segment& segment)
 {
 	QColor randomColor = QColor(qrand() % 255, qrand() % 255, qrand() % 255);
 
-	for (QPoint p : segment)
+	for (DoserModel::Pixel p : segment)
 	{
 		deepImage.setPixelColor(p, randomColor);
 	}
@@ -130,7 +130,7 @@ void DoserWidget::setupModel()
 	connect(this, SIGNAL(doOpenImage(QString)), model, SLOT(openImage(QString)));
 	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
 	connect(this, SIGNAL(doSegment(SegmentationMode)), model, SLOT(segment(SegmentationMode)));
-	connect(model, SIGNAL(deepSegmentChanged(QVector<QPoint>)), this, SLOT(drawSegment(QVector<QPoint>)));
+	connect(model, SIGNAL(deepSegmentChanged(DoserModel::Segment)), this, SLOT(drawSegment(DoserModel::Segment)));
 	connect(model, SIGNAL(iterationProgress(int,int)), this, SLOT(iterationProgressChanged(int,int)));
 	connect(model, SIGNAL(segmentationFinished()), this, SLOT(segmentationFinished()));
 	connect(model, SIGNAL(segmentationProgress(int,int)), this, SLOT(segmentationProgressChanged(int,int)));

@@ -39,7 +39,7 @@ signals:
 
 private slots:
 	void changeGuiMode();
-	void drawSegment(const QVector<QPoint>& segment);
+	void drawSegment(const DoserModel::Segment &segment);
 	void imageChanged(const QImage& sourceImage);
 	void iterationProgressChanged(int current, int max);
 	void openImage();
