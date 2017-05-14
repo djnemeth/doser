@@ -39,7 +39,7 @@ void DoserWidget::drawSegment(const DoserModel::Segment& segment)
 {
 	QColor randomColor = QColor(qrand() % 255, qrand() % 255, qrand() % 255);
 
-	for (DoserModel::Pixel p : segment)
+	for (const DoserModel::Pixel& p : segment)
 	{
 		deepImage.setPixelColor(p, randomColor);
 	}

@@ -20,6 +20,7 @@ class DoserModel : public QObject
 public:
 	typedef QPoint Pixel;
 	typedef QVector<Pixel> Segment;
+	typedef QVector<QPair<Pixel, double>> WeightedSegment; // intentionally not QVector<Node>
 	typedef QPair<Pixel, double> Node;
 	DoserModel();
 
@@ -50,7 +51,7 @@ private:
 	QImage image;
 	bool isGrayscale;
 	bool isSegmenting = false;
-	QMap<SegmentationMode, QVector<Segment>> segments;
+	QMap<SegmentationMode, QVector<WeightedSegment>> segments;
 	QMap<SegmentationMode, QVector<Pixel>> pendingPixels;
 };
 

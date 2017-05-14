@@ -61,14 +61,14 @@ void DoserModel::segment(SegmentationMode mode)
 			dist = distance(nodes, prevNodes);
 		} while (dist > ITERATION_PRECISION);
 
-		Segment segment;
+		WeightedSegment weightedSegment;
 		QVector<Node> newNodes;
 
 		for (const Node& node : nodes)
 		{
 			if (node.second > initialWeight)
 			{
-				segment.append(node.first);
+				weightedSegment.append(node);
 			}
 			else
 			{
@@ -76,14 +76,9 @@ void DoserModel::segment(SegmentationMode mode)
 			}
 		}
 
-		if (segment.empty()) // iff nodes is atomic
+		if (weightedSegment.empty()) // iff nodes is atomic
 		{
-			segment.resize(nodes.size());
-			for (int i = 0; i < nodes.size(); ++i)
-			{
-				segment[i] = nodes[i].first;
-			}
-
+			weightedSegment = nodes;
 			nodes.clear();
 		}
 		else
@@ -96,17 +91,35 @@ void DoserModel::segment(SegmentationMode mode)
 			}
 		}
 
-		if (segment.size() < MINIMAL_SEGMENT_SIZE)
+		if (weightedSegment.size() < MINIMAL_SEGMENT_SIZE)
 		{
-			pendingPixels[mode].append(segment);
+			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
+			{
+				// intentionally not Node
+				pendingPixels[mode].append(weightedPixel.first);
+			}
 		}
 		else
 		{
-			segments[mode].append(segment);
+
+			double sumOfWeights = 0.0;
+			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
+			{
+				sumOfWeights += weightedPixel.second;
+			}
+
+			Segment segment(weightedSegment.size());
+			for (int i = 0; i < weightedSegment.size(); ++i)
+			{
+				segment[i] = weightedSegment[i].first;
+				weightedSegment[i].second /= sumOfWeights;
+			}
+
+			segments[mode].append(weightedSegment);
 			emit deepSegmentChanged(segment);
 		}
 
-		segmentedPixelCount += segment.size();
+		segmentedPixelCount += weightedSegment.size();
 		emit segmentationProgress(segmentedPixelCount, pixelCount);
 	}
 
