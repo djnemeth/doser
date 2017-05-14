@@ -1,4 +1,5 @@
 #include "dosermodel.h"
+#include <algorithm>
 #include <QFuture>
 #include <QtConcurrent/QtConcurrent>
 #include <QtMath>
@@ -7,6 +8,7 @@
 DoserModel::DoserModel()
 {
 	qRegisterMetaType<Segment>("DoserModel::Segment");
+	qRegisterMetaType<QVector<Segment>>("QVector<DoserModel::Segment>");
 }
 
 void DoserModel::openImage(const QString& path)
@@ -33,7 +35,7 @@ void DoserModel::segment(SegmentationMode mode)
 	}
 
 	isSegmenting = true;
-	segments.clear();
+	weightedSegments.clear();
 	pendingPixels.clear();
 
 	int pixelCount = image.width() * image.height();
@@ -101,22 +103,19 @@ void DoserModel::segment(SegmentationMode mode)
 		}
 		else
 		{
-
 			double sumOfWeights = 0.0;
 			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
 			{
 				sumOfWeights += weightedPixel.second;
 			}
 
-			Segment segment(weightedSegment.size());
 			for (int i = 0; i < weightedSegment.size(); ++i)
 			{
-				segment[i] = weightedSegment[i].first;
 				weightedSegment[i].second /= sumOfWeights;
 			}
 
-			segments[mode].append(weightedSegment);
-			emit deepSegmentChanged(segment);
+			weightedSegments[mode].append(weightedSegment);
+			emit deepSegmentChanged(toSegment(weightedSegment));
 		}
 
 		segmentedPixelCount += weightedSegment.size();
@@ -133,7 +132,14 @@ void DoserModel::segment(SegmentationMode mode)
 
 	mergePendingPixels(mode);
 	isSegmenting = false;
-	emit segmentationFinished();
+
+	QVector<Segment> segments(weightedSegments[mode].size());
+	for (int i = 0; i < segments.size(); ++i)
+	{
+		segments[i] = toSegment(weightedSegments[mode][i]);
+	}
+
+	emit segmentationFinished(segments);
 }
 
 double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) const
@@ -154,8 +160,8 @@ double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) c
 
 double DoserModel::weight(const Pixel &px1, const Pixel &px2) const
 {
-	QRgb rgb1 = image.pixel(px1);
-	QRgb rgb2 = image.pixel(px2);
+	const QRgb& rgb1 = image.pixel(px1);
+	const QRgb& rgb2 = image.pixel(px2);
 
 	double squareSum;
 	if (isGrayscale || FORCE_GRAYSCALE)
@@ -164,8 +170,8 @@ double DoserModel::weight(const Pixel &px1, const Pixel &px2) const
 	}
 	else
 	{
-		QColor hsv1 = QColor(rgb1).toHsv();
-		QColor hsv2 = QColor(rgb2).toHsv();
+		const QColor& hsv1 = QColor(rgb1).toHsv();
+		const QColor& hsv2 = QColor(rgb2).toHsv();
 
 		double h1 = hsv1.hueF(), v1 = hsv1.valueF();
 		double h2 = hsv2.hueF(), v2 = hsv2.valueF();
@@ -202,7 +208,7 @@ void DoserModel::iterate(QVector<Node>& races)
 
 	for (int i = 0; i < raceCount; ++i)
 	{
-		auto calculateIthFitness = [=]()
+		const auto& calculateIthFitness = [=]()
 		{
 			double fitness = 0;
 			for (const Node& rival : races)
@@ -236,6 +242,38 @@ void DoserModel::mergePendingPixels(SegmentationMode mode)
 {
 	for (const Pixel& pixel : pendingPixels[mode])
 	{
-		// add the pixel to the most similar segment
+		const auto& similarity = [&](const WeightedSegment& s1, const WeightedSegment& s2)
+		{
+			return inducedWeight(s1, pixel) < inducedWeight(s2, pixel);
+		};
+
+		auto mostSimilarSegment = std::max_element(weightedSegments[mode].begin(),
+			weightedSegments[mode].end(), similarity);
+		mostSimilarSegment->append(qMakePair(pixel, 0.0));
 	}
+}
+
+double DoserModel::inducedWeight(const WeightedSegment& weightedSegment, const Pixel& externalPixel) const
+{
+	double inducedWeight = 0;
+	const Pixel& basisPixel = weightedSegment.first().first;
+
+	for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
+	{
+		inducedWeight += weightedPixel.second * (weight(weightedPixel.first, externalPixel)
+			- weight(weightedPixel.first, basisPixel));
+	}
+
+	return inducedWeight;
+}
+
+DoserModel::Segment DoserModel::toSegment(const WeightedSegment &weightedSegment) const
+{
+	Segment segment(weightedSegment.size());
+	for (int i = 0; i < weightedSegment.size(); ++i)
+	{
+		segment[i] = weightedSegment[i].first;
+	}
+
+	return segment;
 }

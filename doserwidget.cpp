@@ -90,8 +90,13 @@ void DoserWidget::segment()
 	emit doSegment(currentMode());
 }
 
-void DoserWidget::segmentationFinished()
+void DoserWidget::segmentationFinished(const QVector<DoserModel::Segment>& segments)
 {
+	for (const DoserModel::Segment& segment : segments)
+	{
+		drawSegment(segment);
+	}
+
 	mainProgressBar->setValue(0);
 	mainProgressBar->setFormat("Total segmentation");
 	subProgressBar->setFormat("Current iteration");
@@ -132,7 +137,7 @@ void DoserWidget::setupModel()
 	connect(this, SIGNAL(doSegment(SegmentationMode)), model, SLOT(segment(SegmentationMode)));
 	connect(model, SIGNAL(deepSegmentChanged(DoserModel::Segment)), this, SLOT(drawSegment(DoserModel::Segment)));
 	connect(model, SIGNAL(iterationProgress(int,int)), this, SLOT(iterationProgressChanged(int,int)));
-	connect(model, SIGNAL(segmentationFinished()), this, SLOT(segmentationFinished()));
+	connect(model, SIGNAL(segmentationFinished(QVector<DoserModel::Segment>)), this, SLOT(segmentationFinished(QVector<DoserModel::Segment>)));
 	connect(model, SIGNAL(segmentationProgress(int,int)), this, SLOT(segmentationProgressChanged(int,int)));
 
 	modelThread.start();

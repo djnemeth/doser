@@ -28,7 +28,7 @@ signals:
 	void deepSegmentChanged(DoserModel::Segment);
 	void imageChanged(const QImage&);
 	void iterationProgress(int current, int max);
-	void segmentationFinished();
+	void segmentationFinished(QVector<DoserModel::Segment>);
 	void segmentationProgress(int current, int max);
 
 public slots:
@@ -47,11 +47,13 @@ private:
 	double product(const QVector<Node>& v1, const QVector<double>& v2) const;
 	void iterate(QVector<Node>& races);
 	void mergePendingPixels(SegmentationMode mode);
+	double inducedWeight(const WeightedSegment& weightedSegment, const Pixel& externalPixel) const;
+	Segment toSegment(const WeightedSegment& weightedSegment) const;
 
 	QImage image;
 	bool isGrayscale;
 	bool isSegmenting = false;
-	QMap<SegmentationMode, QVector<WeightedSegment>> segments;
+	QMap<SegmentationMode, QVector<WeightedSegment>> weightedSegments;
 	QMap<SegmentationMode, QVector<Pixel>> pendingPixels;
 };
 

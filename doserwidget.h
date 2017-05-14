@@ -44,7 +44,7 @@ private slots:
 	void iterationProgressChanged(int current, int max);
 	void openImage();
 	void segment();
-	void segmentationFinished();
+	void segmentationFinished(const QVector<DoserModel::Segment>& segments);
 	void segmentationProgressChanged(int current, int max);
 
 private:
