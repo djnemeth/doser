@@ -7,6 +7,7 @@
 
 DoserModel::DoserModel()
 {
+	qRegisterMetaType<SegmentationMode>("DoserModel::SegmentationMode");
 	qRegisterMetaType<Segment>("DoserModel::Segment");
 	qRegisterMetaType<QVector<Segment>>("QVector<DoserModel::Segment>");
 }
@@ -27,13 +28,14 @@ void DoserModel::openImage(const QString& path)
 	}
 }
 
-void DoserModel::segment(SegmentationMode mode)
+void DoserModel::doSegment(SegmentationMode mode)
 {
 	if (isSegmenting || image.isNull() || mode != DEEP_MODE)
 	{
 		throw;
 	}
 
+	emit segmentationStarted(mode);
 	isSegmenting = true;
 	weightedSegments.clear();
 	pendingPixels.clear();
@@ -115,7 +117,7 @@ void DoserModel::segment(SegmentationMode mode)
 			}
 
 			weightedSegments[mode].append(weightedSegment);
-			emit deepSegmentChanged(toSegment(weightedSegment));
+			emit segmentChanged(mode, toSegment(weightedSegment));
 		}
 
 		segmentedPixelCount += weightedSegment.size();
@@ -139,7 +141,7 @@ void DoserModel::segment(SegmentationMode mode)
 		segments[i] = toSegment(weightedSegments[mode][i]);
 	}
 
-	emit segmentationFinished(segments);
+	emit segmentationFinished(mode, segments);
 }
 
 double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) const
@@ -276,4 +278,17 @@ DoserModel::Segment DoserModel::toSegment(const WeightedSegment &weightedSegment
 	}
 
 	return segment;
+}
+
+void DoserModel::segment(SegmentationMode mode)
+{
+	if (mode == BOTH_MODE)
+	{
+		doSegment(DEEP_MODE);
+		doSegment(QUICK_MODE);
+	}
+	else
+	{
+		doSegment(mode);
+	}
 }

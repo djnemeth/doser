@@ -8,32 +8,34 @@
 #include <QPoint>
 #include <QString>
 
-enum SegmentationMode
-{
-	QUICK_MODE, DEEP_MODE, BOTH_MODE
-};
-
 class DoserModel : public QObject
 {
 	Q_OBJECT
 
 public:
+	enum SegmentationMode
+	{
+		QUICK_MODE, DEEP_MODE, BOTH_MODE
+	};
+
 	typedef QPoint Pixel;
 	typedef QVector<Pixel> Segment;
 	typedef QVector<QPair<Pixel, double>> WeightedSegment; // intentionally not QVector<Node>
 	typedef QPair<Pixel, double> Node;
+
 	DoserModel();
 
 signals:
-	void deepSegmentChanged(DoserModel::Segment);
-	void imageChanged(const QImage&);
+	void segmentChanged(DoserModel::SegmentationMode mode, DoserModel::Segment segment);
+	void imageChanged(QImage image);
 	void iterationProgress(int current, int max);
-	void segmentationFinished(QVector<DoserModel::Segment>);
+	void segmentationStarted(DoserModel::SegmentationMode mode);
+	void segmentationFinished(DoserModel::SegmentationMode mode, QVector<DoserModel::Segment> finalSegments);
 	void segmentationProgress(int current, int max);
 
 public slots:
 	void openImage(const QString& path);
-	void segment(SegmentationMode mode);
+	void segment(DoserModel::SegmentationMode mode);
 
 private:
 	static constexpr double ITERATION_PRECISION = 0.01;
@@ -49,6 +51,7 @@ private:
 	void mergePendingPixels(SegmentationMode mode);
 	double inducedWeight(const WeightedSegment& weightedSegment, const Pixel& externalPixel) const;
 	Segment toSegment(const WeightedSegment& weightedSegment) const;
+	void doSegment(SegmentationMode mode);
 
 	QImage image;
 	bool isGrayscale;

@@ -27,33 +27,37 @@ DoserWidget::~DoserWidget()
 
 void DoserWidget::changeGuiMode()
 {
-	SegmentationMode mode = currentMode();
-	bool isQuickVisible = mode == QUICK_MODE || mode == BOTH_MODE;
-	bool isDeepVisible = mode == DEEP_MODE || mode == BOTH_MODE;
+	DoserModel::SegmentationMode mode = currentMode();
+	bool isQuickVisible = mode == DoserModel::QUICK_MODE || mode == DoserModel::BOTH_MODE;
+	bool isDeepVisible = mode == DoserModel::DEEP_MODE || mode == DoserModel::BOTH_MODE;
 
 	displayGridColumn(QUICK_GROUP_COLUMN_INDEX, isQuickVisible);
 	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
 }
 
-void DoserWidget::drawSegment(const DoserModel::Segment& segment)
+void DoserWidget::drawSegment(DoserModel::SegmentationMode mode, const DoserModel::Segment& segment)
 {
+	GuiElementType type = toGuiElementType(mode);
 	QColor randomColor = QColor(qrand() % 255, qrand() % 255, qrand() % 255);
 
 	for (const DoserModel::Pixel& p : segment)
 	{
-		deepImage.setPixelColor(p, randomColor);
+		images[type].setPixelColor(p, randomColor);
 	}
 
-	imageLabels[DEEP_LABEL]->setPixmap(QPixmap::fromImage(deepImage));
+	imageLabels[type]->setPixmap(QPixmap::fromImage(images[type]));
 	subProgressBar->setValue(0);
 }
 
 void DoserWidget::imageChanged(const QImage& image)
 {
-	sourceImage = image;
+	images[SOURCE] = image;
+	images[QUICK] = QImage();
+	images[DEEP] = QImage();
 
-	imageLabels[SOURCE_LABEL]->setPixmap(QPixmap::fromImage(sourceImage));
-	imageLabels[DEEP_LABEL]->setText("Deep segments\nnot yet computed.");
+	imageLabels[SOURCE]->setPixmap(QPixmap::fromImage(images[SOURCE]));
+	imageLabels[QUICK]->setText("Quick segments\nnot yet computed.");
+	imageLabels[DEEP]->setText("Deep segments\nnot yet computed.");
 
 	emit status("Image successfully opened.");
 	setButtonsEnabled(true);
@@ -78,23 +82,27 @@ void DoserWidget::openImage()
 
 void DoserWidget::segment()
 {
-	setButtonsEnabled(false);
-	emit status("Segmenting image...");
-
-	deepImage = sourceImage;
-	imageLabels[DEEP_LABEL]->setPixmap(QPixmap::fromImage(deepImage));
-
-	mainProgressBar->setFormat("Total segmentation: %p%");
-	subProgressBar->setFormat("Current iteration: %p%");
-
 	emit doSegment(currentMode());
 }
 
-void DoserWidget::segmentationFinished(const QVector<DoserModel::Segment>& segments)
+void DoserWidget::SegmentationStarted(DoserModel::SegmentationMode mode)
 {
-	for (const DoserModel::Segment& segment : segments)
+	setButtonsEnabled(false);
+
+	GuiElementType type = toGuiElementType(mode);
+	images[type] = images[SOURCE];
+	imageLabels[type]->setPixmap(QPixmap::fromImage(images[type]));
+
+	emit status(toString(mode) + " segmenting image...");
+	mainProgressBar->setFormat("Total segmentation: %p%");
+	subProgressBar->setFormat("Current iteration: %p%");
+}
+
+void DoserWidget::segmentationFinished(DoserModel::SegmentationMode mode, const QVector<DoserModel::Segment>& finalSegments)
+{
+	for (const DoserModel::Segment& segment : finalSegments)
 	{
-		drawSegment(segment);
+		drawSegment(mode, segment);
 	}
 
 	mainProgressBar->setValue(0);
@@ -110,17 +118,17 @@ void DoserWidget::segmentationProgressChanged(int current, int max)
 	mainProgressBar->setValue(current * 100 / max);
 }
 
-SegmentationMode DoserWidget::currentMode() const
+DoserModel::SegmentationMode DoserWidget::currentMode() const
 {
-	return static_cast<SegmentationMode>(modeComboBox->currentData().toInt());
+	return static_cast<DoserModel::SegmentationMode>(modeComboBox->currentData().toInt());
 }
 
 void DoserWidget::setButtonsEnabled(bool enabled)
 {
-	segmentButton->setEnabled(enabled && !sourceImage.isNull());
+	segmentButton->setEnabled(enabled && !images[SOURCE].isNull());
 	openButton->setEnabled(enabled);
-	saveQuickButton->setEnabled(enabled);
-	saveDeepButton->setEnabled(enabled);
+	saveButtons[QUICK]->setEnabled(enabled && !images[QUICK].isNull());
+	saveButtons[DEEP]->setEnabled(enabled && !images[DEEP].isNull());
 }
 
 void DoserWidget::setupModel()
@@ -128,17 +136,22 @@ void DoserWidget::setupModel()
 	model = new DoserModel;
 	model->moveToThread(&modelThread);
 
-	qRegisterMetaType<QVector<QPoint>>("QVector<QPoint>");
-	qRegisterMetaType<SegmentationMode>("SegmentationMode");
-
 	connect(&modelThread, SIGNAL(finished()), model, SLOT(deleteLater()));
 	connect(this, SIGNAL(doOpenImage(QString)), model, SLOT(openImage(QString)));
-	connect(model, SIGNAL(imageChanged(const QImage&)), this, SLOT(imageChanged(const QImage&)));
-	connect(this, SIGNAL(doSegment(SegmentationMode)), model, SLOT(segment(SegmentationMode)));
-	connect(model, SIGNAL(deepSegmentChanged(DoserModel::Segment)), this, SLOT(drawSegment(DoserModel::Segment)));
-	connect(model, SIGNAL(iterationProgress(int,int)), this, SLOT(iterationProgressChanged(int,int)));
-	connect(model, SIGNAL(segmentationFinished(QVector<DoserModel::Segment>)), this, SLOT(segmentationFinished(QVector<DoserModel::Segment>)));
-	connect(model, SIGNAL(segmentationProgress(int,int)), this, SLOT(segmentationProgressChanged(int,int)));
+	connect(model, SIGNAL(imageChanged(const QImage&)),
+		this, SLOT(imageChanged(const QImage&)));
+	connect(this, SIGNAL(doSegment(DoserModel::SegmentationMode)),
+		model, SLOT(segment(DoserModel::SegmentationMode)));
+	connect(model, SIGNAL(segmentChanged(DoserModel::SegmentationMode, DoserModel::Segment)),
+		this, SLOT(drawSegment(DoserModel::SegmentationMode, DoserModel::Segment)));
+	connect(model, SIGNAL(iterationProgress(int, int)),
+		this, SLOT(iterationProgressChanged(int, int)));
+	connect(model, SIGNAL(segmentationStarted(DoserModel::SegmentationMode)),
+		this, SLOT(SegmentationStarted(DoserModel::SegmentationMode)));
+	connect(model, SIGNAL(segmentationFinished(DoserModel::SegmentationMode, QVector<DoserModel::Segment>)),
+		this, SLOT(segmentationFinished(DoserModel::SegmentationMode, QVector<DoserModel::Segment>)));
+	connect(model, SIGNAL(segmentationProgress(int, int)),
+		this, SLOT(segmentationProgressChanged(int, int)));
 
 	modelThread.start();
 }
@@ -159,13 +172,13 @@ void DoserWidget::setupGui()
 	openButton = new QPushButton("Open");
 	connect(openButton, SIGNAL(clicked(bool)), this, SLOT(openImage()));
 
-	saveQuickButton = new QPushButton("Save");
-	saveDeepButton = new QPushButton("Save");
+	saveButtons[QUICK] = new QPushButton("Save");
+	saveButtons[DEEP] = new QPushButton("Save");
 
 	gridLayout->addWidget(openButton, 1, 1);
 	gridLayout->addWidget(segmentButton, 1, 0);
-	gridLayout->addWidget(saveQuickButton, 1, 2);
-	gridLayout->addWidget(saveDeepButton, 1, 3);
+	gridLayout->addWidget(saveButtons[DEEP], 1, DEEP_GROUP_COLUMN_INDEX);
+	gridLayout->addWidget(saveButtons[QUICK], 1, QUICK_GROUP_COLUMN_INDEX);
 
 	mainProgressBar = new QProgressBar;
 	subProgressBar = new QProgressBar;
@@ -207,12 +220,32 @@ void DoserWidget::displayGridColumn(int column, bool isVisible)
 	}
 }
 
+QString DoserWidget::toString(DoserModel::SegmentationMode mode) const
+{
+	if (mode == DoserModel::QUICK_MODE)
+	{
+		return "Quick";
+	}
+
+	return "Deep";
+}
+
+DoserWidget::GuiElementType DoserWidget::toGuiElementType(DoserModel::SegmentationMode mode) const
+{
+	if (mode == DoserModel::QUICK_MODE)
+	{
+		return QUICK;
+	}
+
+	return DEEP;
+}
+
 QGroupBox* DoserWidget::createSettingsGui()
 {
 	modeComboBox = new QComboBox;
-	modeComboBox->addItem("quick", QUICK_MODE);
-	modeComboBox->addItem("deep", DEEP_MODE);
-	modeComboBox->addItem("deep & quick", BOTH_MODE);
+	modeComboBox->addItem("quick", DoserModel::QUICK_MODE);
+	modeComboBox->addItem("deep", DoserModel::DEEP_MODE);
+	modeComboBox->addItem("deep & quick", DoserModel::BOTH_MODE);
 	modeComboBox->setCurrentIndex(1);
 	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeGuiMode()));
 
@@ -242,7 +275,7 @@ QVector<QGroupBox*> DoserWidget::createGuiGroups()
 	QVector<QGroupBox*> groups;
 	groups.push_back(createSettingsGui());
 
-	QVector<ImageLabelType> labelTypes = { SOURCE_LABEL, DEEP_LABEL, QUICK_LABEL };
+	QVector<GuiElementType> guiElementTypes = { SOURCE, DEEP, QUICK };
 	QVector<QString> groupTitles = { "Original image", "Deep segments", "Quick segments" };
 	QVector<QString> labelTexts =
 	{
@@ -251,12 +284,12 @@ QVector<QGroupBox*> DoserWidget::createGuiGroups()
 		"Quick segments\nnot yet computed."
 	};
 
-	for (int i = 0; i < labelTypes.size(); ++i)
+	for (int i = 0; i < guiElementTypes.size(); ++i)
 	{
 		QLabel* label = new QLabel(labelTexts[i]);
 		label->setAlignment(Qt::AlignCenter);
 		label->setScaledContents(true);
-		imageLabels.insert(labelTypes[i], label);
+		imageLabels.insert(guiElementTypes[i], label);
 
 		QVBoxLayout* layout = new QVBoxLayout;
 		layout->addWidget(label);
