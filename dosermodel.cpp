@@ -207,7 +207,7 @@ void DoserModel::solve(SegmentationMode mode)
 	}
 }
 
-void DoserModel::finalize(DoserModel::SegmentationMode mode)
+void DoserModel::finalize(SegmentationMode mode)
 {
 	// collect leftover pixels
 
@@ -273,7 +273,7 @@ void DoserModel::iterate()
 	}
 }
 
-void DoserModel::extrapolate(DoserModel::WeightedSegment &weightedSegment)
+void DoserModel::extrapolate(WeightedSegment& weightedSegment)
 {
 	int externalCount = externalPixels.size();
 	if (externalCount == 0)
@@ -321,12 +321,14 @@ void DoserModel::merge()
 	{
 		const auto& ithSimilarity = [=](const WeightedSegment& s1, const WeightedSegment& s2)
 		{
-			return inducedWeight(s1, pendingPixels[i]) < inducedWeight(s2, pendingPixels[i]);
+			return inducedWeight(s1, pendingPixels[i])
+				< inducedWeight(s2, pendingPixels[i]);
 		};
 
 		const auto& calculateIthMergeInfo = [=]()
 		{
-			return qMakePair(i, std::max_element(weightedSegments.begin(), weightedSegments.end(), ithSimilarity));
+			return qMakePair(i, std::max_element(weightedSegments.begin(),
+				weightedSegments.end(), ithSimilarity));
 		};
 
 		futureMergeInfos[i] = QtConcurrent::run(calculateIthMergeInfo);
@@ -389,7 +391,7 @@ double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) c
 	return product;
 }
 
-DoserModel::Segment DoserModel::toSegment(const WeightedSegment &weightedSegment) const
+DoserModel::Segment DoserModel::toSegment(const WeightedSegment& weightedSegment) const
 {
 	Segment segment(weightedSegment.size());
 	for (int i = 0; i < weightedSegment.size(); ++i)
@@ -400,7 +402,7 @@ DoserModel::Segment DoserModel::toSegment(const WeightedSegment &weightedSegment
 	return segment;
 }
 
-double DoserModel::weight(const Pixel &px1, const Pixel &px2) const
+double DoserModel::weight(const Pixel& px1, const Pixel& px2) const
 {
 	const QRgb& rgb1 = image.pixel(px1);
 	const QRgb& rgb2 = image.pixel(px2);

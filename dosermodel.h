@@ -44,7 +44,6 @@ public slots:
 
 private:
 	// parameters
-
 	static constexpr double ITERATION_PRECISION = 0.01;
 	static constexpr double WEIGHT_RATIO_SQUARE = 0.01;
 	static constexpr double TARGET_SEGMENTATION_RATIO = 0.9;
@@ -53,7 +52,6 @@ private:
 	static constexpr double SAMPLING_PROBABILITY = 0.1;
 
 	// segmentation procedures
-
 	void doSegment(SegmentationMode mode);
 	void initialize(SegmentationMode mode);
 	void solve(SegmentationMode mode);
@@ -63,7 +61,6 @@ private:
 	void merge();
 
 	// utility functions
-
 	double distance(const QVector<Node>& v1, const QVector<Node>& v2) const;
 	double inducedWeight(const WeightedSegment& weightedSegment, const Pixel& externalPixel) const;
 	double product(const QVector<Node>& v1, const QVector<double>& v2) const;
@@ -71,12 +68,10 @@ private:
 	double weight(const Pixel& px1, const Pixel& px2) const;
 
 	// image-related representation
-
 	QImage image;
 	bool isGrayscale;
 
 	// segmentation-related representation
-
 	bool isSegmenting = false;
 	QVector<Node> internalNodes;
 	QVector<Pixel> externalPixels;
