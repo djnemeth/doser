@@ -52,6 +52,7 @@ private slots:
 	// utility slots
 	void changeGuiMode();
 	void openImage();
+	void saveImage();
 	void segment();
 
 private:

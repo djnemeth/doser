@@ -110,13 +110,31 @@ void DoserWidget::changeGuiMode()
 
 void DoserWidget::openImage()
 {
-	QString imagePath = QFileDialog::getOpenFileName(this,
-		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
-	if (!imagePath.isEmpty() && !imagePath.isNull())
+	QString loadPath = QFileDialog::getOpenFileName(this, tr("Open original image"),
+		"", tr("Image files (*.png *.jpg *.bmp)"));
+	if (!loadPath.isEmpty() && !loadPath.isNull())
 	{
 		setControlsEnabled(false);
 		emit status("Opening image...");
-		emit doOpenImage(imagePath);
+		emit doOpenImage(loadPath);
+	}
+}
+
+void DoserWidget::saveImage()
+{
+	QString savePath = QFileDialog::getSaveFileName(this, tr("Save segmented image"),
+		"", tr("Image files (*.png *.jpg *.bmp)"));
+	if (!savePath.isEmpty() && !savePath.isNull())
+	{
+		GuiElementType type = sender() == saveButtons[QUICK] ? QUICK : DEEP;
+		if (images[type].save(savePath))
+		{
+			emit status("Image successfully saved.");
+		}
+		else
+		{
+			emit status("Failed to save the image.");
+		}
 	}
 }
 
@@ -191,6 +209,8 @@ void DoserWidget::setupGui()
 
 	saveButtons[QUICK] = new QPushButton("Save");
 	saveButtons[DEEP] = new QPushButton("Save");
+	connect(saveButtons[QUICK], SIGNAL(clicked(bool)), this, SLOT(saveImage()));
+	connect(saveButtons[DEEP], SIGNAL(clicked(bool)), this, SLOT(saveImage()));
 
 	gridLayout->addWidget(openButton, 1, 1);
 	gridLayout->addWidget(segmentButton, 1, 0);
