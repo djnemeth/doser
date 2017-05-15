@@ -46,25 +46,21 @@ void DoserWidget::drawSegment(DoserModel::SegmentationMode mode, const DoserMode
 	}
 
 	imageLabels[type]->setPixmap(QPixmap::fromImage(images[type]));
-	subProgressBar->setValue(0);
 }
 
 void DoserWidget::imageChanged(const QImage& image)
 {
 	images[SOURCE] = image;
-	images[QUICK] = QImage();
-	images[DEEP] = QImage();
-
 	imageLabels[SOURCE]->setPixmap(QPixmap::fromImage(images[SOURCE]));
-	imageLabels[QUICK]->setText("Quick segments\nnot yet computed.");
-	imageLabels[DEEP]->setText("Deep segments\nnot yet computed.");
+	resetImages();
 
 	emit status("Image successfully opened.");
 	setButtonsEnabled(true);
 }
 
-void DoserWidget::iterationProgressChanged(int current, int max)
+void DoserWidget::subProcessProgressChanged(DoserModel::SubProcessType type, int current, int max)
 {
+	subProgressBar->setFormat("Current " + toString(type) + ": %p%");
 	subProgressBar->setValue(current * 100 / max);
 }
 
@@ -82,6 +78,7 @@ void DoserWidget::openImage()
 
 void DoserWidget::segment()
 {
+	resetImages();
 	emit doSegment(currentMode());
 }
 
@@ -95,7 +92,6 @@ void DoserWidget::SegmentationStarted(DoserModel::SegmentationMode mode)
 
 	emit status(toString(mode) + " segmenting image...");
 	mainProgressBar->setFormat("Total segmentation: %p%");
-	subProgressBar->setFormat("Current iteration: %p%");
 }
 
 void DoserWidget::segmentationFinished(DoserModel::SegmentationMode mode, const QVector<DoserModel::Segment>& finalSegments)
@@ -107,7 +103,8 @@ void DoserWidget::segmentationFinished(DoserModel::SegmentationMode mode, const 
 
 	mainProgressBar->setValue(0);
 	mainProgressBar->setFormat("Total segmentation");
-	subProgressBar->setFormat("Current iteration");
+	subProgressBar->setValue(0);
+	subProgressBar->setFormat("Current subprocess");
 
 	emit status("Image successfully segmented.");
 	setButtonsEnabled(true);
@@ -144,8 +141,8 @@ void DoserWidget::setupModel()
 		model, SLOT(segment(DoserModel::SegmentationMode)));
 	connect(model, SIGNAL(segmentChanged(DoserModel::SegmentationMode, DoserModel::Segment)),
 		this, SLOT(drawSegment(DoserModel::SegmentationMode, DoserModel::Segment)));
-	connect(model, SIGNAL(iterationProgress(int, int)),
-		this, SLOT(iterationProgressChanged(int, int)));
+	connect(model, SIGNAL(subProcessProgress(DoserModel::SubProcessType, int, int)),
+		this, SLOT(subProcessProgressChanged(DoserModel::SubProcessType, int, int)));
 	connect(model, SIGNAL(segmentationStarted(DoserModel::SegmentationMode)),
 		this, SLOT(SegmentationStarted(DoserModel::SegmentationMode)));
 	connect(model, SIGNAL(segmentationFinished(DoserModel::SegmentationMode, QVector<DoserModel::Segment>)),
@@ -193,7 +190,7 @@ void DoserWidget::setupGui()
 	initProgressBar(mainProgressBar);
 	initProgressBar(subProgressBar);
 	mainProgressBar->setFormat("Total segmentation");
-	subProgressBar->setFormat("Current iteration");
+	subProgressBar->setFormat("Current subprocess");
 
 	QVBoxLayout* progressLayout = new QVBoxLayout;
 	progressLayout->addSpacing(5);
@@ -222,12 +219,38 @@ void DoserWidget::displayGridColumn(int column, bool isVisible)
 
 QString DoserWidget::toString(DoserModel::SegmentationMode mode) const
 {
-	if (mode == DoserModel::QUICK_MODE)
+	switch (mode)
 	{
+	case DoserModel::QUICK_MODE:
 		return "Quick";
+	case DoserModel::DEEP_MODE:
+		return "Deep";
+	default:
+		return "";
 	}
+}
 
-	return "Deep";
+QString DoserWidget::toString(DoserModel::SubProcessType type) const
+{
+	switch (type)
+	{
+	case DoserModel::ITERATION:
+		return "iteration";
+	case DoserModel::EXTRAPOLATION:
+		return "extrapolation";
+	case DoserModel::MERGING:
+		return "merging";
+	default:
+		return "subprocess";
+	}
+}
+
+void DoserWidget::resetImages()
+{
+	images[QUICK] = QImage();
+	images[DEEP] = QImage();
+	imageLabels[QUICK]->setText("Quick segments\nnot yet computed.");
+	imageLabels[DEEP]->setText("Deep segments\nnot yet computed.");
 }
 
 DoserWidget::GuiElementType DoserWidget::toGuiElementType(DoserModel::SegmentationMode mode) const

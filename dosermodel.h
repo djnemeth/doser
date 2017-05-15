@@ -18,6 +18,11 @@ public:
 		QUICK_MODE, DEEP_MODE, BOTH_MODE
 	};
 
+	enum SubProcessType
+	{
+		ITERATION, EXTRAPOLATION, MERGING
+	};
+
 	typedef QPoint Pixel;
 	typedef QVector<Pixel> Segment;
 	typedef QVector<QPair<Pixel, double>> WeightedSegment; // intentionally not QVector<Node>
@@ -28,7 +33,7 @@ public:
 signals:
 	void segmentChanged(DoserModel::SegmentationMode mode, DoserModel::Segment segment);
 	void imageChanged(QImage image);
-	void iterationProgress(int current, int max);
+	void subProcessProgress(DoserModel::SubProcessType type, int current, int max);
 	void segmentationStarted(DoserModel::SegmentationMode mode);
 	void segmentationFinished(DoserModel::SegmentationMode mode, QVector<DoserModel::Segment> finalSegments);
 	void segmentationProgress(int current, int max);
@@ -41,23 +46,26 @@ private:
 	static constexpr double ITERATION_PRECISION = 0.01;
 	static constexpr double WEIGHT_RATIO_SQUARE = 0.01;
 	static constexpr double TARGET_SEGMENTATION_RATIO = 0.9;
-	static constexpr double MINIMAL_SEGMENT_SIZE = 15;
+	static constexpr double MINIMAL_SEGMENT_SIZE = 50;
 	static const bool FORCE_GRAYSCALE = false;
+	static constexpr double SAMPLING_PROBABILITY = 0.01;
 
 	double weight(const Pixel& px1, const Pixel& px2) const;
 	double distance(const QVector<Node>& v1, const QVector<Node>& v2) const;
 	double product(const QVector<Node>& v1, const QVector<double>& v2) const;
 	void iterate(QVector<Node>& races);
-	void mergePendingPixels(SegmentationMode mode);
+	void mergePendingPixels();
 	double inducedWeight(const WeightedSegment& weightedSegment, const Pixel& externalPixel) const;
 	Segment toSegment(const WeightedSegment& weightedSegment) const;
 	void doSegment(SegmentationMode mode);
+	void extrapolate(WeightedSegment& weightedSegment);
 
 	QImage image;
 	bool isGrayscale;
 	bool isSegmenting = false;
-	QMap<SegmentationMode, QVector<WeightedSegment>> weightedSegments;
-	QMap<SegmentationMode, QVector<Pixel>> pendingPixels;
+	QVector<WeightedSegment> weightedSegments;
+	QVector<Pixel> externalPixels;
+	QVector<Pixel> pendingPixels;
 };
 
 #endif // DOSERMODEL_H

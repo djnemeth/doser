@@ -41,7 +41,7 @@ private slots:
 	void changeGuiMode();
 	void drawSegment(DoserModel::SegmentationMode mode, const DoserModel::Segment &segment);
 	void imageChanged(const QImage& image);
-	void iterationProgressChanged(int current, int max);
+	void subProcessProgressChanged(DoserModel::SubProcessType type, int current, int max);
 	void openImage();
 	void segment();
 	void SegmentationStarted(DoserModel::SegmentationMode mode);
@@ -58,6 +58,8 @@ private:
 	void displayGridColumn(int column, bool isVisible);
 	GuiElementType toGuiElementType(DoserModel::SegmentationMode mode) const;
 	QString toString(DoserModel::SegmentationMode mode) const;
+	QString toString(DoserModel::SubProcessType type) const;
+	void resetImages();
 
 	DoserModel* model;
 	QThread modelThread;

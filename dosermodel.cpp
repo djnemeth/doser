@@ -1,15 +1,21 @@
 #include "dosermodel.h"
 #include <algorithm>
+#include <cstdlib>
 #include <QFuture>
 #include <QtConcurrent/QtConcurrent>
+#include <QTime>
 #include <QtMath>
 #include <QVector>
+#include <QDebug>
 
 DoserModel::DoserModel()
 {
 	qRegisterMetaType<SegmentationMode>("DoserModel::SegmentationMode");
 	qRegisterMetaType<Segment>("DoserModel::Segment");
 	qRegisterMetaType<QVector<Segment>>("QVector<DoserModel::Segment>");
+	qRegisterMetaType<SubProcessType>("DoserModel::SubProcessType");
+
+	qsrand(QTime::currentTime().msec());
 }
 
 void DoserModel::openImage(const QString& path)
@@ -30,7 +36,7 @@ void DoserModel::openImage(const QString& path)
 
 void DoserModel::doSegment(SegmentationMode mode)
 {
-	if (isSegmenting || image.isNull() || mode != DEEP_MODE)
+	if (isSegmenting || image.isNull() || (mode != QUICK_MODE && mode != DEEP_MODE))
 	{
 		throw;
 	}
@@ -38,85 +44,114 @@ void DoserModel::doSegment(SegmentationMode mode)
 	emit segmentationStarted(mode);
 	isSegmenting = true;
 	weightedSegments.clear();
+	externalPixels.clear();
 	pendingPixels.clear();
 
-	int pixelCount = image.width() * image.height();
-	double initialWeight = 1.0 / pixelCount;
-
-	QVector<Node> nodes;
-	nodes.reserve(pixelCount);
+	QVector<Node> internalNodes;
 	for (int y = 0; y < image.height(); ++y)
 	{
 		for (int x = 0; x < image.width(); ++x)
 		{
-			nodes.append(qMakePair(Pixel(x, y), initialWeight));
-		}
-	}
-
-	int segmentedPixelCount = 0;
-	int targetPixelCount = TARGET_SEGMENTATION_RATIO * pixelCount;
-	while (segmentedPixelCount < targetPixelCount)
-	{
-		double dist;
-		do
-		{
-			QVector<Node> prevNodes(nodes);
-			iterate(nodes);
-			dist = distance(nodes, prevNodes);
-		} while (dist > ITERATION_PRECISION);
-
-		WeightedSegment weightedSegment;
-		QVector<Node> newNodes;
-
-		for (const Node& node : nodes)
-		{
-			if (node.second > initialWeight)
+			if (mode == DEEP_MODE || ((double) qrand() / RAND_MAX) < SAMPLING_PROBABILITY)
 			{
-				weightedSegment.append(node);
+				internalNodes.append(qMakePair(Pixel(x, y), 0));
 			}
 			else
 			{
-				newNodes.append(node);
+				externalPixels.append(Pixel(x, y));
+			}
+		}
+	}
+
+	if (internalNodes.isEmpty())
+	{
+		internalNodes.reserve(externalPixels.size());
+		for (int i = 0; i < externalPixels.size(); ++i)
+		{
+			internalNodes.append(qMakePair(externalPixels[i], 0));
+		}
+
+		externalPixels.clear();
+	}
+
+	double initialWeight = 1.0 / internalNodes.size();
+	for (int i = 0; i < internalNodes.size(); ++i)
+	{
+		internalNodes[i].second = initialWeight;
+	}
+
+	int segmentedPixelCount = 0;
+	int pixelCount = image.width() * image.height();
+	int targetPixelCount = TARGET_SEGMENTATION_RATIO * pixelCount;
+	while (segmentedPixelCount < targetPixelCount)
+	{
+		if (internalNodes.isEmpty())
+		{
+			break;
+		}
+
+		double dist;
+		do
+		{
+			QVector<Node> prevInternalNodes(internalNodes);
+			iterate(internalNodes);
+			dist = distance(internalNodes, prevInternalNodes);
+		} while (dist > ITERATION_PRECISION);
+
+		WeightedSegment weightedSegment;
+		QVector<Node> newInternalNodes;
+
+		for (const Node& internalNode : internalNodes)
+		{
+			if (internalNode.second > initialWeight)
+			{
+				weightedSegment.append(internalNode);
+			}
+			else
+			{
+				newInternalNodes.append(internalNode);
 			}
 		}
 
 		if (weightedSegment.empty()) // iff nodes is atomic
 		{
-			weightedSegment = nodes;
-			nodes.clear();
+			weightedSegment = internalNodes;
+			internalNodes.clear();
 		}
 		else
 		{
-			nodes = newNodes;
-			initialWeight = 1.0 / nodes.size();
-			for (int i = 0; i < nodes.size(); ++i)
-			{
-				nodes[i].second = initialWeight;
-			}
+			internalNodes = newInternalNodes;
+		}
+
+		double sumOfWeights = 0.0;
+		for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
+		{
+			sumOfWeights += weightedPixel.second;
+		}
+
+		for (int i = 0; i < weightedSegment.size(); ++i)
+		{
+			weightedSegment[i].second /= sumOfWeights;
+		}
+
+		extrapolate(weightedSegment);
+
+		initialWeight = 1.0 / internalNodes.size();
+		for (int i = 0; i < internalNodes.size(); ++i)
+		{
+			internalNodes[i].second = initialWeight;
 		}
 
 		if (weightedSegment.size() < MINIMAL_SEGMENT_SIZE)
 		{
 			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
-			{
-				// intentionally not Node
-				pendingPixels[mode].append(weightedPixel.first);
+			{ // intentionally not Node
+				pendingPixels.append(weightedPixel.first);
 			}
 		}
 		else
 		{
-			double sumOfWeights = 0.0;
-			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
-			{
-				sumOfWeights += weightedPixel.second;
-			}
-
-			for (int i = 0; i < weightedSegment.size(); ++i)
-			{
-				weightedSegment[i].second /= sumOfWeights;
-			}
-
-			weightedSegments[mode].append(weightedSegment);
+			weightedSegments.append(weightedSegment);
 			emit segmentChanged(mode, toSegment(weightedSegment));
 		}
 
@@ -124,24 +159,61 @@ void DoserModel::doSegment(SegmentationMode mode)
 		emit segmentationProgress(segmentedPixelCount, pixelCount);
 	}
 
-	if (!nodes.empty())
+	pendingPixels.append(externalPixels);
+	for (int i = 0; i < internalNodes.size(); ++i)
 	{
-		for (int i = 0; i < nodes.size(); ++i)
-		{
-			pendingPixels[mode].append(nodes[i].first);
-		}
+		pendingPixels.append(internalNodes[i].first);
 	}
 
-	mergePendingPixels(mode);
-	isSegmenting = false;
+	mergePendingPixels();
 
-	QVector<Segment> segments(weightedSegments[mode].size());
+	QVector<Segment> segments(weightedSegments.size());
 	for (int i = 0; i < segments.size(); ++i)
 	{
-		segments[i] = toSegment(weightedSegments[mode][i]);
+		segments[i] = toSegment(weightedSegments[i]);
 	}
 
 	emit segmentationFinished(mode, segments);
+	isSegmenting = false;
+}
+
+void DoserModel::extrapolate(DoserModel::WeightedSegment &weightedSegment)
+{
+	int externalCount = externalPixels.size();
+	if (externalCount == 0)
+	{
+		return;
+	}
+
+	QVector<QFuture<QPair<int, bool>>> futures(externalCount);
+	for (int i = 0; i < externalCount; ++i)
+	{
+		const auto& extraPolateIthPixel = [=]()
+		{
+			return qMakePair(i, inducedWeight(weightedSegment, externalPixels[i]) >= 0);
+		};
+
+		futures[i] = QtConcurrent::run(extraPolateIthPixel);
+	}
+
+	QVector<Pixel> newExternalPixels;
+	for (int i = 0; i < externalCount; ++i)
+	{
+		const QPair<int, bool>& extrapolated = futures[i].result();
+
+		if (extrapolated.second)
+		{
+			weightedSegment.append(qMakePair(externalPixels[extrapolated.first], 0));
+		}
+		else
+		{
+			newExternalPixels.append(externalPixels[extrapolated.first]);
+		}
+
+		emit subProcessProgress(EXTRAPOLATION, i + 1, externalCount + 1);
+	}
+
+	externalPixels = newExternalPixels;
 }
 
 double DoserModel::product(const QVector<Node>& v1, const QVector<double>& v2) const
@@ -230,7 +302,7 @@ void DoserModel::iterate(QVector<Node>& races)
 		const QPair<int, double>& fitness = futures[i].result();
 		fitnesses[fitness.first] = fitness.second;
 
-		emit iterationProgress(i + 1, raceCount);
+		emit subProcessProgress(ITERATION, i + 1, raceCount + 1);
 	}
 
 	double overallFitness = product(races, fitnesses);
@@ -240,18 +312,32 @@ void DoserModel::iterate(QVector<Node>& races)
 	}
 }
 
-void DoserModel::mergePendingPixels(SegmentationMode mode)
+void DoserModel::mergePendingPixels()
 {
-	for (const Pixel& pixel : pendingPixels[mode])
+	int pendingCount = pendingPixels.size();
+	QVector<QFuture<QPair<int, QVector<WeightedSegment>::iterator>>> futures(pendingCount);
+
+	for (int i = 0; i < pendingCount; ++i)
 	{
-		const auto& similarity = [&](const WeightedSegment& s1, const WeightedSegment& s2)
+		const auto& ithSimilarity = [=](const WeightedSegment& s1, const WeightedSegment& s2)
 		{
-			return inducedWeight(s1, pixel) < inducedWeight(s2, pixel);
+			return inducedWeight(s1, pendingPixels[i]) < inducedWeight(s2, pendingPixels[i]);
 		};
 
-		auto mostSimilarSegment = std::max_element(weightedSegments[mode].begin(),
-			weightedSegments[mode].end(), similarity);
-		mostSimilarSegment->append(qMakePair(pixel, 0.0));
+		const auto& mergeIthPending = [=]()
+		{
+			return qMakePair(i, std::max_element(weightedSegments.begin(), weightedSegments.end(), ithSimilarity));
+		};
+
+		futures[i] = QtConcurrent::run(mergeIthPending);
+	}
+
+	for (int i = 0; i < pendingCount; ++i)
+	{
+		const QPair<int, QVector<WeightedSegment>::iterator>& mergeInfo = futures[i].result();
+		mergeInfo.second->append(qMakePair(pendingPixels[mergeInfo.first], 0));
+
+		emit subProcessProgress(MERGING, i + 1, pendingPixels.size() + 1);
 	}
 }
 
