@@ -1,7 +1,9 @@
 #ifndef DOSERWIDGET_H
 #define DOSERWIDGET_H
 
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QImage>
@@ -10,6 +12,7 @@
 #include <QPoint>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QThread>
 #include <QVector>
 #include <QWidget>
@@ -34,7 +37,7 @@ public:
 
 signals:
 	void doOpenImage(const QString& path);
-	void doSegment(DoserModel::SegmentationMode mode);
+	void doSegment(DoserModel::SegmentationMode mode, DoserModel::SegmentationParameters parameters);
 	void status(const QString& message);
 
 private slots:
@@ -61,7 +64,7 @@ private:
 	// gui-altering procedures
 	void displayGridColumn(int column, bool isVisible);
 	void resetImages();
-	void setButtonsEnabled(bool enabled);
+	void setControlsEnabled(bool enabled);
 
 	// utility functions
 	DoserModel::SegmentationMode currentMode() const;
@@ -82,6 +85,12 @@ private:
 
 	// controls
 	QComboBox* modeComboBox;
+	QSpinBox* targetSegmentationRatioSpin;
+	QSpinBox* minimalSegmentSizeSpin;
+	QDoubleSpinBox* iterationPrecisionSpin;
+	QDoubleSpinBox* samplingProbabilitySpin;
+	QDoubleSpinBox* weightRatioSpin;
+	QCheckBox* forceGrayscaleCheckBox;
 	QPushButton* segmentButton;
 	QPushButton* openButton;
 	QMap<GuiElementType, QPushButton*> saveButtons;

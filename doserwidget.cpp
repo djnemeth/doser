@@ -1,5 +1,7 @@
 #include "doserwidget.h"
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -8,8 +10,10 @@
 #include <QLayout>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QString>
 #include <QTime>
+#include <QtMath>
 #include <QVBoxLayout>
 
 // constructor and destructor
@@ -36,12 +40,12 @@ void DoserWidget::imageChanged(const QImage& image)
 	resetImages();
 
 	emit status("Image successfully opened.");
-	setButtonsEnabled(true);
+	setControlsEnabled(true);
 }
 
 void DoserWidget::segmentationStarted(DoserModel::SegmentationMode mode)
 {
-	setButtonsEnabled(false);
+	setControlsEnabled(false);
 
 	GuiElementType type = toGuiElementType(mode);
 	images[type] = images[SOURCE];
@@ -77,7 +81,7 @@ void DoserWidget::segmentationFinished(DoserModel::SegmentationMode mode, const 
 	subProgressBar->setFormat("Current subprocess");
 
 	emit status("Image successfully segmented.");
-	setButtonsEnabled(true);
+	setControlsEnabled(true);
 }
 
 void DoserWidget::segmentationProgressChanged(int current, int max)
@@ -99,6 +103,7 @@ void DoserWidget::changeGuiMode()
 	bool isQuickVisible = mode == DoserModel::QUICK_MODE || mode == DoserModel::BOTH_MODE;
 	bool isDeepVisible = mode == DoserModel::DEEP_MODE || mode == DoserModel::BOTH_MODE;
 
+	samplingProbabilitySpin->setEnabled(isQuickVisible);
 	displayGridColumn(QUICK_GROUP_COLUMN_INDEX, isQuickVisible);
 	displayGridColumn(DEEP_GROUP_COLUMN_INDEX, isDeepVisible);
 }
@@ -109,7 +114,7 @@ void DoserWidget::openImage()
 		tr("Open original image"), "", tr("Image files (*.png *.jpg *.bmp)"));
 	if (!imagePath.isEmpty() && !imagePath.isNull())
 	{
-		setButtonsEnabled(false);
+		setControlsEnabled(false);
 		emit status("Opening image...");
 		emit doOpenImage(imagePath);
 	}
@@ -118,7 +123,16 @@ void DoserWidget::openImage()
 void DoserWidget::segment()
 {
 	resetImages();
-	emit doSegment(currentMode());
+
+	DoserModel::SegmentationParameters parameters;
+	parameters.targetSegmentationRatio = targetSegmentationRatioSpin->value() / 100.0;
+	parameters.minimalSegmentSize = minimalSegmentSizeSpin->value();
+	parameters.iterationPrecision = iterationPrecisionSpin->value();
+	parameters.samplingProbability = samplingProbabilitySpin->value() / 100.0;
+	parameters.weightRatioSquare = qPow(weightRatioSpin->value(), 2);
+	parameters.forceGrayscale = forceGrayscaleCheckBox->isChecked();
+
+	emit doSegment(currentMode(), parameters);
 }
 
 // initializer procedures
@@ -137,8 +151,8 @@ void DoserWidget::setupModel()
 		this, SLOT(imageChanged(QImage)));
 
 	// segmentation-related
-	connect(this, SIGNAL(doSegment(DoserModel::SegmentationMode)),
-		model, SLOT(segment(DoserModel::SegmentationMode)));
+	connect(this, SIGNAL(doSegment(DoserModel::SegmentationMode, DoserModel::SegmentationParameters)),
+		model, SLOT(segment(DoserModel::SegmentationMode, DoserModel::SegmentationParameters)));
 	connect(model, SIGNAL(segmentationStarted(DoserModel::SegmentationMode)),
 		this, SLOT(segmentationStarted(DoserModel::SegmentationMode)));
 	connect(model, SIGNAL(segmentChanged(DoserModel::SegmentationMode, DoserModel::Segment)),
@@ -216,7 +230,7 @@ void DoserWidget::setupGui()
 	setLayout(mainLayout);
 
 	changeGuiMode();
-	setButtonsEnabled(true);
+	setControlsEnabled(true);
 }
 
 QVector<QGroupBox*> DoserWidget::createGuiGroups()
@@ -263,20 +277,79 @@ QVector<QGroupBox*> DoserWidget::createGuiGroups()
 
 QGroupBox* DoserWidget::createSettingsGui()
 {
+	// mode
+
 	modeComboBox = new QComboBox;
 	modeComboBox->addItem("quick", DoserModel::QUICK_MODE);
 	modeComboBox->addItem("deep", DoserModel::DEEP_MODE);
 	modeComboBox->addItem("deep & quick", DoserModel::BOTH_MODE);
 	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeGuiMode()));
 
+	// target ratio
+
+	targetSegmentationRatioSpin = new QSpinBox;
+	targetSegmentationRatioSpin->setRange(0, 100);
+	targetSegmentationRatioSpin->setSingleStep(1);
+	targetSegmentationRatioSpin->setSuffix("%");
+	targetSegmentationRatioSpin->setValue(90);
+
+	// minimal segment size
+
+	minimalSegmentSizeSpin = new QSpinBox;
+	minimalSegmentSizeSpin->setMinimum(0);
+	minimalSegmentSizeSpin->setSingleStep(1);
+	minimalSegmentSizeSpin->setSuffix("px");
+	minimalSegmentSizeSpin->setValue(50);
+
+	// iteration precision
+
+	iterationPrecisionSpin = new QDoubleSpinBox;
+	iterationPrecisionSpin->setMinimum(0);
+	iterationPrecisionSpin->setSingleStep(0.01);
+	iterationPrecisionSpin->setValue(0.01);
+
+	// sampling probability
+
+	samplingProbabilitySpin = new QDoubleSpinBox;
+	samplingProbabilitySpin->setRange(0, 100);
+	samplingProbabilitySpin->setSingleStep(0.5);
+	samplingProbabilitySpin->setDecimals(1);
+	samplingProbabilitySpin->setSuffix("%");
+	samplingProbabilitySpin->setValue(10);
+
+	// weight ratio
+
+	weightRatioSpin = new QDoubleSpinBox;
+	weightRatioSpin->setMinimum(0.01);
+	weightRatioSpin->setSingleStep(0.01);
+	weightRatioSpin->setValue(2);
+
+	// force grayscale
+
+	forceGrayscaleCheckBox = new QCheckBox;
+	forceGrayscaleCheckBox->setChecked(false);
+
+	// assembly
+
 	QGridLayout* settingsLayout = new QGridLayout;
 	settingsLayout->addWidget(new QLabel("Mode:"), 0, 0);
 	settingsLayout->addWidget(modeComboBox, 0, 1);
-	settingsLayout->setRowStretch(1, 1);
+	settingsLayout->addWidget(new QLabel("Target ratio:"), 1, 0);
+	settingsLayout->addWidget(targetSegmentationRatioSpin, 1, 1);
+	settingsLayout->addWidget(new QLabel("Minimal size:"), 2, 0);
+	settingsLayout->addWidget(minimalSegmentSizeSpin, 2, 1);
+	settingsLayout->addWidget(new QLabel("Precision:"), 3, 0);
+	settingsLayout->addWidget(iterationPrecisionSpin, 3, 1);
+	settingsLayout->addWidget(new QLabel("Sampling ratio:"), 4, 0);
+	settingsLayout->addWidget(samplingProbabilitySpin, 4, 1);
+	settingsLayout->addWidget(new QLabel("Weight ratio:"), 5, 0);
+	settingsLayout->addWidget(weightRatioSpin, 5, 1);
+	settingsLayout->addWidget(new QLabel("Force grayscale:"), 6, 0);
+	settingsLayout->addWidget(forceGrayscaleCheckBox, 6, 1);
+	settingsLayout->setRowStretch(7, 1);
 
 	QGroupBox* settingsGroup = new QGroupBox("Settings");
 	settingsGroup->setLayout(settingsLayout);
-
 	return settingsGroup;
 }
 
@@ -298,8 +371,17 @@ void DoserWidget::resetImages()
 	imageLabels[DEEP]->setText("Deep segments\nnot yet computed.");
 }
 
-void DoserWidget::setButtonsEnabled(bool enabled)
+void DoserWidget::setControlsEnabled(bool enabled)
 {
+	modeComboBox->setEnabled(enabled);
+	targetSegmentationRatioSpin->setEnabled(enabled);
+	minimalSegmentSizeSpin->setEnabled(enabled);
+	iterationPrecisionSpin->setEnabled(enabled);
+	samplingProbabilitySpin->setEnabled((currentMode() == DoserModel::QUICK_MODE
+		|| currentMode() == DoserModel::BOTH_MODE) && enabled);
+	weightRatioSpin->setEnabled(enabled);
+	forceGrayscaleCheckBox->setEnabled(enabled);
+
 	segmentButton->setEnabled(enabled && !images[SOURCE].isNull());
 	openButton->setEnabled(enabled);
 	saveButtons[QUICK]->setEnabled(enabled && !images[QUICK].isNull());

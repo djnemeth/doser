@@ -12,6 +12,7 @@
 DoserModel::DoserModel()
 {
 	qRegisterMetaType<SegmentationMode>("DoserModel::SegmentationMode");
+	qRegisterMetaType<SegmentationParameters>("DoserModel::SegmentationParameters");
 	qRegisterMetaType<Segment>("DoserModel::Segment");
 	qRegisterMetaType<QVector<Segment>>("QVector<DoserModel::Segment>");
 	qRegisterMetaType<SubProcessType>("DoserModel::SubProcessType");
@@ -21,8 +22,10 @@ DoserModel::DoserModel()
 
 // public slots
 
-void DoserModel::segment(SegmentationMode mode)
+void DoserModel::segment(SegmentationMode mode, SegmentationParameters parameters)
 {
+	this->parameters = parameters;
+
 	if (mode == BOTH_MODE)
 	{
 		doSegment(DEEP_MODE);
@@ -82,7 +85,8 @@ void DoserModel::initialize(SegmentationMode mode)
 	{
 		for (int x = 0; x < image.width(); ++x)
 		{
-			if (mode == DEEP_MODE || ((double) qrand() / RAND_MAX) < SAMPLING_PROBABILITY)
+			if (mode == DEEP_MODE
+				|| ((double) qrand() / RAND_MAX) < parameters.samplingProbability)
 			{
 				internalNodes.append(qMakePair(Pixel(x, y), 0));
 			}
@@ -113,7 +117,7 @@ void DoserModel::solve(SegmentationMode mode)
 
 	int segmentedPixelCount = 0;
 	int pixelCount = image.width() * image.height();
-	int targetPixelCount = TARGET_SEGMENTATION_RATIO * pixelCount;
+	int targetPixelCount = parameters.targetSegmentationRatio * pixelCount;
 
 	// segmentation loop
 
@@ -140,7 +144,7 @@ void DoserModel::solve(SegmentationMode mode)
 			QVector<Node> prevInternalNodes(internalNodes);
 			iterate();
 			dist = distance(internalNodes, prevInternalNodes);
-		} while (dist > ITERATION_PRECISION);
+		} while (dist > parameters.iterationPrecision);
 
 		// extracting the segment
 
@@ -187,7 +191,7 @@ void DoserModel::solve(SegmentationMode mode)
 
 		// registering the extended segment
 
-		if (weightedSegment.size() < MINIMAL_SEGMENT_SIZE)
+		if (weightedSegment.size() < parameters.minimalSegmentSize)
 		{
 			for (const QPair<Pixel, double>& weightedPixel : weightedSegment)
 			{ // intentionally not Node
@@ -408,7 +412,7 @@ double DoserModel::weight(const Pixel& px1, const Pixel& px2) const
 	const QRgb& rgb2 = image.pixel(px2);
 
 	double squareSum;
-	if (isGrayscale || FORCE_GRAYSCALE)
+	if (isGrayscale || parameters.forceGrayscale)
 	{
 		squareSum = qPow((qGray(rgb1) - qGray(rgb2)) / 255.0, 2);
 	}
@@ -426,5 +430,5 @@ double DoserModel::weight(const Pixel& px1, const Pixel& px2) const
 		squareSum += qPow(vs1 * qCos(h1) - vs2 * qCos(h2), 2);
 	}
 
-	return qExp(-squareSum / WEIGHT_RATIO_SQUARE);
+	return qExp(-squareSum / parameters.weightRatioSquare);
 }

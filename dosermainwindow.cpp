@@ -6,8 +6,8 @@ DoserMainWindow::DoserMainWindow(QWidget *parent)
 	: QMainWindow(parent)
 {
 	setWindowTitle("DoSer");
-	setMinimumHeight(400);
-	setMinimumWidth(800);
+	setMinimumHeight(390);
+	setMinimumWidth(780);
 	statusBar()->showMessage("Please select the image to be segmented.");
 
 	DoserWidget* view = new DoserWidget;

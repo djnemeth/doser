@@ -18,6 +18,16 @@ public:
 		QUICK_MODE, DEEP_MODE, BOTH_MODE
 	};
 
+	struct SegmentationParameters
+	{
+		double targetSegmentationRatio = 0.9;
+		double minimalSegmentSize = 50;
+		double iterationPrecision = 0.01;
+		double samplingProbability = 0.1;
+		double weightRatioSquare = 0.01;
+		bool forceGrayscale = false;
+	};
+
 	enum SubProcessType
 	{
 		ITERATION, EXTRAPOLATION, MERGING
@@ -40,17 +50,9 @@ signals:
 
 public slots:
 	void openImage(const QString& path);
-	void segment(DoserModel::SegmentationMode mode);
+	void segment(DoserModel::SegmentationMode mode, DoserModel::SegmentationParameters parameters);
 
 private:
-	// parameters
-	static constexpr double ITERATION_PRECISION = 0.01;
-	static constexpr double WEIGHT_RATIO_SQUARE = 0.01;
-	static constexpr double TARGET_SEGMENTATION_RATIO = 0.9;
-	static constexpr double MINIMAL_SEGMENT_SIZE = 50;
-	static const bool FORCE_GRAYSCALE = false;
-	static constexpr double SAMPLING_PROBABILITY = 0.1;
-
 	// segmentation procedures
 	void doSegment(SegmentationMode mode);
 	void initialize(SegmentationMode mode);
@@ -73,6 +75,7 @@ private:
 
 	// segmentation-related representation
 	bool isSegmenting = false;
+	SegmentationParameters parameters;
 	QVector<Node> internalNodes;
 	QVector<Pixel> externalPixels;
 	QVector<Pixel> pendingPixels;
