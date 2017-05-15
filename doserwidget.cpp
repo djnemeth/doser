@@ -1,4 +1,5 @@
 #include "doserwidget.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -15,6 +16,9 @@
 #include <QTime>
 #include <QtMath>
 #include <QVBoxLayout>
+
+#include "colorsupplier.h"
+#include "dosermodel.h"
 
 // constructor and destructor
 
@@ -46,6 +50,7 @@ void DoserWidget::imageChanged(const QImage& image)
 void DoserWidget::segmentationStarted(DoserModel::SegmentationMode mode)
 {
 	setControlsEnabled(false);
+	colorSupplier.reset();
 
 	GuiElementType type = toGuiElementType(mode);
 	images[type] = images[SOURCE];
@@ -58,11 +63,11 @@ void DoserWidget::segmentationStarted(DoserModel::SegmentationMode mode)
 void DoserWidget::drawSegment(DoserModel::SegmentationMode mode, const DoserModel::Segment& segment)
 {
 	GuiElementType type = toGuiElementType(mode);
-	QColor randomColor = QColor(qrand() % 255, qrand() % 255, qrand() % 255);
+	QColor color = colorSupplier.nextColor();
 
 	for (const DoserModel::Pixel& p : segment)
 	{
-		images[type].setPixelColor(p, randomColor);
+		images[type].setPixelColor(p, color);
 	}
 
 	imageLabels[type]->setPixmap(QPixmap::fromImage(images[type]));
@@ -70,6 +75,7 @@ void DoserWidget::drawSegment(DoserModel::SegmentationMode mode, const DoserMode
 
 void DoserWidget::segmentationFinished(DoserModel::SegmentationMode mode, const QVector<DoserModel::Segment>& finalSegments)
 {
+	colorSupplier.reset();
 	for (const DoserModel::Segment& segment : finalSegments)
 	{
 		drawSegment(mode, segment);

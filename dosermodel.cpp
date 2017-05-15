@@ -1,4 +1,5 @@
 #include "dosermodel.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <QFuture>

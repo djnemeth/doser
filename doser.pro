@@ -19,3 +19,4 @@ SOURCES += main.cpp\
 HEADERS += dosermainwindow.h \
 	doserwidget.h \
 	dosermodel.h \
+	colorsupplier.h

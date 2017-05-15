@@ -17,6 +17,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include "colorsupplier.h"
 #include "dosermodel.h"
 
 class DoserWidget : public QWidget
@@ -77,12 +78,13 @@ private:
 	DoserModel* model;
 	QThread modelThread;
 
-	// display-related elements
+	// display-related attributes
 	QGridLayout* gridLayout;
 	QMap<GuiElementType, QImage> images;
 	QMap<GuiElementType, QLabel*> imageLabels;
 	QProgressBar* mainProgressBar;
 	QProgressBar* subProgressBar;
+	ColorSupplier colorSupplier;
 
 	// controls
 	QComboBox* modeComboBox;
