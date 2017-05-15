@@ -269,7 +269,6 @@ QGroupBox* DoserWidget::createSettingsGui()
 	modeComboBox->addItem("quick", DoserModel::QUICK_MODE);
 	modeComboBox->addItem("deep", DoserModel::DEEP_MODE);
 	modeComboBox->addItem("deep & quick", DoserModel::BOTH_MODE);
-	modeComboBox->setCurrentIndex(1);
 	connect(modeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(changeGuiMode()));
 
 	QGridLayout* settingsLayout = new QGridLayout;
