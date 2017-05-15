@@ -8,6 +8,6 @@ DoSer is based on the work of Massimiliano Pavan and Marcello Pelillo, titled
 _Efficiently Segmenting Images with Dominant Sets_. See the full paper at
 [Springer](https://link.springer.com/chapter/10.1007/978-3-540-30125-7_3).
 
-See the [milestones](https://github.com/djnemeth/doser/milestones?direction=asc&sort=due_date&state=open)
+See the [milestones](https://github.com/djnemeth/doser/milestones?direction=asc&sort=due_date&state=closed)
 for an estimated development plan. See the
 [wiki](https://github.com/djnemeth/doser/wiki) for additional details.
